@@ -9,7 +9,7 @@
 ### 패키지 설치
 
 ```bash
-# 필수 패키지 (⚠️ 현재 프로젝트에는 아직 설치되어 있지 않음 — 폼 구현 전에 설치)
+# 필수 패키지 (이 프로젝트에는 이미 설치됨: react-hook-form, zod v4, @hookform/resolvers v5)
 npm install react-hook-form @hookform/resolvers zod
 
 # shadcn/ui Form 컴포넌트 (현재 components/ui에는 form.tsx 없음)

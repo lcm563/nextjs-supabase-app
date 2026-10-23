@@ -14,6 +14,8 @@ Next.js 16과 Supabase를 사용한 풀스택 웹 애플리케이션 스타터 �
 - **UI 컴포넌트**: shadcn/ui (new-york 스타일, Radix UI 기반)
 - **테마**: next-themes (다크 모드 지원)
 - **아이콘**: Lucide React
+- **폼/검증**: react-hook-form + zod v4 + @hookform/resolvers (v5)
+- **토스트**: sonner (`components/ui/sonner.tsx`, `app/layout.tsx`에 `Toaster` 배치)
 - **타입스크립트**: 엄격 모드 활성화
 - **코드 품질**: ESLint (flat config), Prettier (+ `prettier-plugin-tailwindcss`), Husky, lint-staged
 
@@ -80,8 +82,17 @@ npm run build       # 빌드 성공 확인
 ### 인증 흐름
 
 - **Proxy 보호**: 루트 `proxy.ts`는 정적 파일·이미지를 제외한 모든 요청을 가로채서 인증 확인
-- **보호된 라우트**: `/protected` 등 공개 경로가 아닌 모든 경로는 인증된 사용자만 접근 가능
-- **공개 경로**: `/`, `/login*`, `/auth/*` (login, sign-up, forgot-password 등), `/instruments`, `/instruments/*` (조건은 `lib/supabase/proxy.ts` 참고)
+- **보호된 라우트**: `/events/**` 등 공개 경로가 아닌 모든 경로는 인증된 사용자만 접근 가능
+- **리다이렉트 경로 검증**: 로그인·이메일 확인 후 이동하는 `next` 값은 반드시 `lib/safe-next.ts`의 `sanitizeNext()`로 검증 (오픈 리다이렉트 방지)
+- **공유 링크 미리보기**: `/events/[id]`는 로그인이 필요하므로 카카오톡 등 미리보기는 루트 기본 메타데이터 카드로 표시됨 (PRD 8장)
+
+### 주요 디렉터리
+
+- `types/`: 도메인 타입(`event.ts`, `rsvp.ts`)과 Server Action 결과 규약(`action.ts`)
+- `lib/validations/`: zod 검증 스키마 (클라이언트 폼 + Server Action 공용), KST ↔ UTC 변환
+- `lib/format.ts`(일시 표시, Asia/Seoul 고정), `lib/event-status.ts`(이벤트 단계 판정), `lib/action-result.ts`(`ok`/`fail`), `lib/safe-next.ts`
+- `lib/mock/`: Phase 2 UI용 더미 데이터 (Task 007/008에서 실제 쿼리로 교체 후 삭제)
+- **공개 경로**: `/`, `/login*`, `/auth/*` (login, sign-up, forgot-password 등) (조건은 `lib/supabase/proxy.ts` 참고)
 - **인증 확인 라우트**: `/auth/confirm/route.ts`에서 이메일 확인 처리
 
 ### 환경 변수
@@ -171,7 +182,7 @@ import { Button } from "@/components/ui/button";
 ## 추가 참고사항
 
 - **Turbopack**: Next.js 16의 기본 번들러로, 개발 서버와 빌드에 사용됨
-- **가이드 문서** (`docs/guides/`): `nextjs-16.md`, `project-structure.md`, `styling-guide.md`, `component-patterns.md`, `forms-react-hook-form.md` (폼 라이브러리는 아직 미설치, 설치 후 사용)
+- **가이드 문서** (`docs/guides/`): `nextjs-16.md`, `project-structure.md`, `styling-guide.md`, `component-patterns.md`, `forms-react-hook-form.md` (react-hook-form, zod, @hookform/resolvers 설치 완료)
 - **Slack 알림 훅**: `.claude/hooks/*.sh`는 `.env.local`의 `SLACK_WEBHOOK_URL`이 필요하며 현재 `settings.json`에 등록되어 있지 않음
 - **폰트**: Geist Sans 폰트를 기본으로 사용
 - **다크 모드**: next-themes를 통해 시스템 설정 기반 자동 전환 지원

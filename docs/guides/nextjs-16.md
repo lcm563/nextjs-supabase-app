@@ -301,7 +301,7 @@ export const config = {
 
 - `createServerClient`와 `supabase.auth.getClaims()` 사이에 다른 코드를 넣지 않습니다.
 - 새 `NextResponse`를 만들면 반드시 쿠키를 복사합니다.
-- 공개 경로(`/`, `/login*`, `/auth/*`, `/instruments`, `/instruments/*`) 외에는 `/auth/login`으로 리다이렉트합니다.
+- 공개 경로(`/`, `/login*`, `/auth/*`) 외에는 `/auth/login`으로 리다이렉트합니다.
 
 ### 🔄 New: unauthorized/forbidden API (실험적)
 

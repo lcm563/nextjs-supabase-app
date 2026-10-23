@@ -6,3 +6,4 @@ shrimp_data
 *.png
 *.ico
 next-env.d.ts
+.playwright-mcp
