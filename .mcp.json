@@ -26,7 +26,7 @@
       "command": "node",
       "args": ["D:\\Workspace_ClaudeCode\\2026_InflearnCources\\mcp-shrimp-task-manager\\dist/index.js"],
       "env": {
-        "DATA_DIR": "/Users/gymcoding/workspace/courses/nextjs-supabase-app/shrimp_data",
+        "DATA_DIR": "D:\\Workspace_ClaudeCode\\2026_InflearnCources\\nextjs-supabase-app\\shrimp_data",
         "TEMPLATES_USE": "en",
         "ENABLE_GUI": "true"
       }
