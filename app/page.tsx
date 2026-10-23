@@ -1,58 +1,72 @@
-import { DeployButton } from "@/components/deploy-button";
-import { EnvVarWarning } from "@/components/env-var-warning";
-import { AuthButton } from "@/components/auth-button";
-import { Hero } from "@/components/hero";
-import { ThemeSwitcher } from "@/components/theme-switcher";
-import { ConnectSupabaseSteps } from "@/components/tutorial/connect-supabase-steps";
-import { SignUpUserSteps } from "@/components/tutorial/sign-up-user-steps";
-import { hasEnvVars } from "@/lib/utils";
+import { SiteFooter } from "@/components/site-footer";
+import { SiteHeader } from "@/components/site-header";
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Link2, ListChecks, Users } from "lucide-react";
 import Link from "next/link";
-import { Suspense } from "react";
+
+const FEATURES = [
+  {
+    icon: Link2,
+    title: "링크 하나로 공지",
+    description:
+      "일시·장소·정원을 등록하고 공유 링크를 카톡방에 붙여 넣으면 공지 끝.",
+  },
+  {
+    icon: ListChecks,
+    title: "클릭 한 번으로 응답",
+    description: "참석·불참·미정 중 하나만 누르면 응답이 바로 집계됩니다.",
+  },
+  {
+    icon: Users,
+    title: "정원·대기자 자동 관리",
+    description:
+      "정원이 차면 대기자로, 자리가 나면 먼저 기다린 사람부터 자동 승격.",
+  },
+];
 
 export default function Home() {
   return (
-    <main className="flex min-h-screen flex-col items-center">
-      <div className="flex w-full flex-1 flex-col items-center gap-20">
-        <nav className="flex h-16 w-full justify-center border-b border-b-foreground/10">
-          <div className="flex w-full max-w-5xl items-center justify-between p-3 px-5 text-sm">
-            <div className="flex items-center gap-5 font-semibold">
-              <Link href={"/"}>Next.js Supabase Starter</Link>
-              <div className="flex items-center gap-2">
-                <DeployButton />
-              </div>
-            </div>
-            {!hasEnvVars ? (
-              <EnvVarWarning />
-            ) : (
-              <Suspense>
-                <AuthButton />
-              </Suspense>
-            )}
-          </div>
-        </nav>
-        <div className="flex max-w-5xl flex-1 flex-col gap-20 p-5">
-          <Hero />
-          <main className="flex flex-1 flex-col gap-6 px-4">
-            <h2 className="mb-4 text-xl font-medium">Next steps</h2>
-            {hasEnvVars ? <SignUpUserSteps /> : <ConnectSupabaseSteps />}
-          </main>
-        </div>
-
-        <footer className="mx-auto flex w-full items-center justify-center gap-8 border-t py-16 text-center text-xs">
-          <p>
-            Powered by{" "}
-            <a
-              href="https://supabase.com/?utm_source=create-next-app&utm_medium=template&utm_term=nextjs"
-              target="_blank"
-              className="font-bold hover:underline"
-              rel="noreferrer"
-            >
-              Supabase
-            </a>
+    <div className="flex min-h-screen flex-col">
+      <SiteHeader />
+      <main className="mx-auto flex w-full max-w-5xl flex-1 flex-col gap-16 px-4 py-16">
+        <section className="flex flex-col items-center gap-6 text-center">
+          <h1 className="text-3xl font-bold tracking-tight sm:text-5xl">
+            정기 모임 공지와 참석 관리를
+            <br />한 곳에서
+          </h1>
+          <p className="max-w-xl text-muted-foreground sm:text-lg">
+            링크 하나로 공지하고, 클릭 한 번으로 참석 현황이 정리됩니다.
+            수영·헬스·러닝 모임 총무를 위한 가장 간단한 방법.
           </p>
-          <ThemeSwitcher />
-        </footer>
-      </div>
-    </main>
+          <div className="flex w-full flex-col gap-3 sm:w-auto sm:flex-row">
+            <Button asChild size="lg">
+              <Link href="/auth/sign-up">무료로 시작하기</Link>
+            </Button>
+            <Button asChild size="lg" variant="outline">
+              <Link href="/events">내 이벤트 보기</Link>
+            </Button>
+          </div>
+        </section>
+
+        <section className="grid gap-4 sm:grid-cols-3">
+          {FEATURES.map(({ icon: Icon, title, description }) => (
+            <Card key={title}>
+              <CardHeader>
+                <Icon className="mb-2 size-6 text-primary" />
+                <CardTitle className="text-lg">{title}</CardTitle>
+                <CardDescription>{description}</CardDescription>
+              </CardHeader>
+            </Card>
+          ))}
+        </section>
+      </main>
+      <SiteFooter />
+    </div>
   );
 }
