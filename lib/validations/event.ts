@@ -17,13 +17,34 @@ export type EventFormValues = {
 };
 
 const DATETIME_LOCAL_PATTERN = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2})?$/;
+// 이벤트 일시로 허용하는 연도 범위 (0000년 등 확장 연도 ISO 문자열 방지)
+const MIN_YEAR = 2000;
+const MAX_YEAR = 2100;
 
 // "2026-10-25T07:00" (한국 시간) → "2026-10-24T22:00:00.000Z", 잘못된 값이면 null
 export function kstLocalToIso(value: string): string | null {
   if (!DATETIME_LOCAL_PATTERN.test(value)) return null;
+  const year = Number(value.slice(0, 4));
+  if (year < MIN_YEAR || year > MAX_YEAR) return null;
   const withSeconds = value.length === 16 ? `${value}:00` : value;
   const date = new Date(`${withSeconds}+09:00`);
-  return Number.isNaN(date.getTime()) ? null : date.toISOString();
+  if (Number.isNaN(date.getTime())) return null;
+  const iso = date.toISOString();
+  // 왕복 비교로 존재하지 않는 날짜·시각(2월 30일, 24:00 등)의 자동 넘김 차단
+  if (isoToKstLocal(iso) !== value.slice(0, 16)) return null;
+  return iso;
+}
+
+const KST_OFFSET_MS = 9 * 60 * 60 * 1000;
+
+// kstLocalToIso의 역변환: "2026-10-24T22:00:00.000Z" → "2026-10-25T07:00", null/잘못된 값이면 ""
+// UTC에 9시간을 더한 뒤 getUTC*로 읽으므로 브라우저 시간대와 무관하다.
+export function isoToKstLocal(iso: string | null): string {
+  if (!iso) return "";
+  const time = Date.parse(iso);
+  if (Number.isNaN(time)) return "";
+  // "YYYY-MM-DDTHH:mm:ss.sssZ"의 앞 16자리
+  return new Date(time + KST_OFFSET_MS).toISOString().slice(0, 16);
 }
 
 function requiredDateTime(emptyMessage: string, invalidMessage: string) {
@@ -100,7 +121,8 @@ export const eventInputSchema: z.ZodType<EventInput, EventFormValues> = z
       .trim()
       .transform((value, ctx) => {
         if (value === "") return null;
-        const capacity = Number(value);
+        // "1e2", "0x10" 같은 표기가 Number()로 정수가 되지 않도록 숫자만 허용
+        const capacity = /^\d+$/.test(value) ? Number(value) : NaN;
         if (
           !Number.isInteger(capacity) ||
           capacity < 1 ||
@@ -145,3 +167,16 @@ export const emptyEventFormValues: EventFormValues = {
   capacity: "",
   rsvp_deadline: "",
 };
+
+// 저장된 이벤트 값 → 폼 값 (수정 폼 채우기, 복제 시 미리 채움)
+export function eventToFormValues(input: EventInput): EventFormValues {
+  return {
+    title: input.title,
+    description: input.description ?? "",
+    location: input.location,
+    starts_at: isoToKstLocal(input.starts_at),
+    ends_at: isoToKstLocal(input.ends_at),
+    capacity: input.capacity === null ? "" : String(input.capacity),
+    rsvp_deadline: isoToKstLocal(input.rsvp_deadline),
+  };
+}
