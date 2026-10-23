@@ -18,6 +18,8 @@ const ThemeSwitcher = () => {
 
   // useEffect only runs on the client, so now we can safely show the UI
   useEffect(() => {
+    // next-themes 권장 하이드레이션 가드 패턴이므로 규칙 예외 처리
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setMounted(true);
   }, []);
 

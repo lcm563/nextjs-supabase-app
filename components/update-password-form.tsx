@@ -25,7 +25,7 @@ export function UpdatePasswordForm({
   const router = useRouter();
 
   const handleForgotPassword = async (
-    e: React.SubmitEvent<HTMLFormElement>,
+    e: React.SubmitEvent<HTMLFormElement>
   ) => {
     e.preventDefault();
     const supabase = createClient();

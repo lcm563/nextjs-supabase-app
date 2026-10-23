@@ -25,7 +25,7 @@ export function ForgotPasswordForm({
   const [isLoading, setIsLoading] = useState(false);
 
   const handleForgotPassword = async (
-    e: React.SubmitEvent<HTMLFormElement>,
+    e: React.SubmitEvent<HTMLFormElement>
   ) => {
     e.preventDefault();
     const supabase = createClient();
