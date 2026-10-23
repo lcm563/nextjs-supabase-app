@@ -31,7 +31,7 @@ color: red
 
 ### 스타일링 접근법
 
-- Tailwind CSS v4 유틸리티 클래스만 사용
+- Tailwind CSS v3 유틸리티 클래스만 사용
 - Shadcn UI의 new-york 스타일 테마 적용
 - 테마 일관성을 위한 CSS 변수 활용
 - 모바일 우선 반응형 디자인 준수
@@ -60,9 +60,9 @@ color: red
 1. resolve-library-id로 라이브러리 ID 확인
    예: "next.js", "tailwindcss", "radix-ui"
 
-2. get-library-docs로 최신 문서 가져오기
-   topic 파라미터로 특정 주제에 집중
-   예: topic="responsive design", topic="forms"
+2. query-docs로 최신 문서 가져오기
+   query 파라미터로 특정 주제에 집중
+   예: query="responsive design", query="forms"
 ```
 
 **사용 워크플로우:**
@@ -283,9 +283,9 @@ get_item_examples_from_registries(
 
 ```
 resolve-library-id("radix-ui")
-get-library-docs(
-  context7CompatibleLibraryID: "/radix-ui/primitives",
-  topic: "card patterns"
+query-docs(
+  libraryId: "/radix-ui/primitives",
+  query: "card patterns"
 )
 ```
 
@@ -345,9 +345,9 @@ Stage 3: 반응형 전략
 2. **Context7로 Next.js 레이아웃 패턴 참조**
 
 ```
-get-library-docs(
-  context7CompatibleLibraryID: "/vercel/next.js",
-  topic: "layout patterns app router"
+query-docs(
+  libraryId: "/vercel/next.js",
+  query: "layout patterns app router"
 )
 ```
 
@@ -395,9 +395,9 @@ export default function InvoicePage() {
 1. **Context7로 최신 반응형 패턴 조회**
 
 ```
-get-library-docs(
-  context7CompatibleLibraryID: "/tailwindcss/tailwindcss",
-  topic: "responsive design"
+query-docs(
+  libraryId: "/tailwindcss/tailwindcss",
+  query: "responsive design"
 )
 ```
 

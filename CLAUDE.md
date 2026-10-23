@@ -4,17 +4,18 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## 프로젝트 개요
 
-Next.js 15와 Supabase를 사용한 풀스택 웹 애플리케이션 스타터 킷입니다. App Router, Server Components, 그리고 Supabase Auth를 활용한 인증 시스템을 포함하고 있습니다.
+Next.js 16과 Supabase를 사용한 풀스택 웹 애플리케이션 스타터 킷입니다. App Router, Server Components, 그리고 Supabase Auth를 활용한 인증 시스템을 포함하고 있습니다.
 
 ## 주요 기술 스택
 
-- **프레임워크**: Next.js (최신 버전, App Router)
+- **프레임워크**: Next.js 16 (App Router, `cacheComponents` 활성화)
 - **인증/데이터베이스**: Supabase (@supabase/ssr, @supabase/supabase-js)
-- **스타일링**: Tailwind CSS
+- **스타일링**: Tailwind CSS v3 (`tailwind.config.ts`, `tailwindcss-animate`)
 - **UI 컴포넌트**: shadcn/ui (new-york 스타일, Radix UI 기반)
 - **테마**: next-themes (다크 모드 지원)
 - **아이콘**: Lucide React
 - **타입스크립트**: 엄격 모드 활성화
+- **코드 품질**: ESLint (flat config), Prettier (+ `prettier-plugin-tailwindcss`), Husky, lint-staged
 
 ## 개발 명령어
 
@@ -71,31 +72,33 @@ npm run build       # 빌드 성공 확인
    - 브라우저 환경의 Client Components에서 사용
    - `createBrowserClient` 사용
 
-3. **Middleware**: `lib/supabase/middleware.ts`의 `updateSession()`
-   - Next.js 미들웨어에서 사용
+3. **Proxy**: `lib/supabase/proxy.ts`의 `updateSession()`
+   - 루트 `proxy.ts`의 `proxy()`에서 호출 (Next.js 16에서 `middleware.ts`는 `proxy.ts`로 대체됨)
    - 인증되지 않은 사용자를 `/auth/login`으로 리다이렉트
    - **중요**: `createServerClient`와 `supabase.auth.getClaims()` 사이에 코드를 추가하지 말 것
 
 ### 인증 흐름
 
-- **미들웨어 보호**: `middleware.ts`는 모든 요청을 가로채서 인증 확인
-- **보호된 라우트**: `/protected` 경로는 인증된 사용자만 접근 가능
-- **공개 경로**: `/auth/*` (login, sign-up, forgot-password 등)는 미들웨어에서 제외
+- **Proxy 보호**: 루트 `proxy.ts`는 정적 파일·이미지를 제외한 모든 요청을 가로채서 인증 확인
+- **보호된 라우트**: `/protected` 등 공개 경로가 아닌 모든 경로는 인증된 사용자만 접근 가능
+- **공개 경로**: `/`, `/login*`, `/auth/*` (login, sign-up, forgot-password 등), `/instruments`, `/instruments/*` (조건은 `lib/supabase/proxy.ts` 참고)
 - **인증 확인 라우트**: `/auth/confirm/route.ts`에서 이메일 확인 처리
 
 ### 환경 변수
 
 필수 환경 변수 (`.env.local`):
+
 ```
 NEXT_PUBLIC_SUPABASE_URL=[Supabase 프로젝트 URL]
 NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=[Supabase Anon Key]
 ```
 
-**참고**: 환경 변수가 설정되지 않은 경우 미들웨어는 자동으로 건너뜁니다.
+**참고**: 환경 변수가 설정되지 않은 경우 Proxy는 인증 확인을 자동으로 건너뜁니다 (`lib/utils.ts`의 `hasEnvVars`).
 
 ### 경로 별칭 설정
 
 `tsconfig.json`에서 `@/*`를 프로젝트 루트로 매핑:
+
 ```typescript
 // 사용 예시
 import { createClient } from "@/lib/supabase/server";
@@ -114,19 +117,21 @@ import { Button } from "@/components/ui/button";
 ### Supabase 클라이언트 사용 시 주의사항
 
 1. **Server Components/Route Handlers**:
+
    ```typescript
    import { createClient } from "@/lib/supabase/server";
 
    export default async function ServerComponent() {
      // 매번 새로 생성 (전역 변수 X)
      const supabase = await createClient();
-     const { data } = await supabase.from('table').select();
+     const { data } = await supabase.from("table").select();
    }
    ```
 
 2. **Client Components**:
+
    ```typescript
-   'use client';
+   "use client";
    import { createClient } from "@/lib/supabase/client";
 
    export default function ClientComponent() {
@@ -135,36 +140,43 @@ import { Button } from "@/components/ui/button";
    }
    ```
 
-3. **Middleware 수정 시**:
+3. **Proxy(`lib/supabase/proxy.ts`) 수정 시**:
    - `createServerClient`와 `supabase.auth.getClaims()` 사이에 코드를 추가하지 말 것
    - 새로운 Response 객체를 만들 경우 반드시 쿠키를 복사할 것
 
 ### TypeScript 타입
 
-- Supabase 데이터베이스 타입은 `lib/supabase/database.types.ts`에 정의됨
-- 타입 생성: Supabase CLI를 사용하여 자동 생성 가능
+- Supabase 데이터베이스 타입 파일(`lib/supabase/database.types.ts`)은 아직 없음
+- 타입 생성: Supabase MCP의 `generate_typescript_types` 또는 Supabase CLI로 생성하여 위 경로에 저장
 
 ## MCP 서버 설정
 
 프로젝트는 다음 MCP 서버를 사용합니다:
+
 - **supabase**: Supabase 데이터베이스 연동
 - **playwright**: 브라우저 자동화
 - **context7**: 문서 검색
 - **shadcn**: shadcn/ui 컴포넌트 관리
+- **sequential-thinking**: 단계별 사고 지원
 - **shrimp-task-manager**: 작업 관리
 
 ## Git Hooks
 
 프로젝트는 Husky를 사용하여 커밋 전 자동 검증을 수행합니다:
-- **pre-commit**: 스테이지된 파일에 대해 ESLint + Prettier 자동 실행
-- 커밋 전 자동으로 코드 품질 검사 및 포맷팅 수행
+
+- **pre-commit**: 스테이지된 파일에 대해 lint-staged로 ESLint(`--fix`) + Prettier 자동 실행 (`lint-staged.config.mjs`)
+- **pre-push**: `npm run typecheck` 전체 타입 체크
+- **Claude Code 훅**: `.claude/settings.json`의 PostToolUse 훅이 Edit/Write한 파일을 Prettier로 자동 포맷
 
 ## 추가 참고사항
 
-- **Turbopack**: 개발 서버는 Turbopack을 사용하여 더 빠른 개발 경험 제공
+- **Turbopack**: Next.js 16의 기본 번들러로, 개발 서버와 빌드에 사용됨
+- **가이드 문서** (`docs/guides/`): `nextjs-16.md`, `project-structure.md`, `styling-guide.md`, `component-patterns.md`, `forms-react-hook-form.md` (폼 라이브러리는 아직 미설치, 설치 후 사용)
+- **Slack 알림 훅**: `.claude/hooks/*.sh`는 `.env.local`의 `SLACK_WEBHOOK_URL`이 필요하며 현재 `settings.json`에 등록되어 있지 않음
 - **폰트**: Geist Sans 폰트를 기본으로 사용
 - **다크 모드**: next-themes를 통해 시스템 설정 기반 자동 전환 지원
 
 💡 **상세 규칙은 위 개발 가이드 문서들을 참조하세요**
+
 - 테스트 계정: gymcoding@gmail.com / qwer1234
 - 관리자 테스트 계정: bruce.lean17@gmail.com / qwer1234

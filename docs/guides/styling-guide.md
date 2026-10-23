@@ -1,19 +1,19 @@
 # 스타일링 가이드
 
-이 문서는 TailwindCSS v4 + shadcn/ui를 활용한 스타일링 규칙과 모범 사례를 제공합니다.
+이 문서는 TailwindCSS v3.4 + shadcn/ui를 활용한 스타일링 규칙과 모범 사례를 제공합니다.
 
 ## 🎨 기술 스택 개요
 
 ### 핵심 스타일링 도구
 
-- **TailwindCSS v4**: 유틸리티 기반 CSS 프레임워크
+- **TailwindCSS v3.4**: 유틸리티 기반 CSS 프레임워크
 - **shadcn/ui**: Radix UI 기반 컴포넌트 라이브러리 (new-york style)
 - **next-themes**: 다크모드 지원
-- **tw-animate-css**: 애니메이션 라이브러리
+- **tailwindcss-animate**: 애니메이션 플러그인 (`tailwind.config.ts`에 등록)
 - **CSS Variables**: 동적 테마 시스템
 - **prettier-plugin-tailwindcss**: 자동 클래스 정렬
 
-## 🚀 TailwindCSS v4 사용 규칙
+## 🚀 TailwindCSS v3.4 사용 규칙
 
 ### 기본 원칙
 
@@ -97,8 +97,8 @@ Prettier 플러그인이 자동으로 정렬하지만, 수동 작성 시 다음 
 ### 기본 사용법
 
 ```tsx
-import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 // ✅ shadcn/ui 컴포넌트 활용
 export function UserCard({ user }) {
@@ -111,7 +111,7 @@ export function UserCard({ user }) {
         <Button variant="outline">프로필 보기</Button>
       </CardContent>
     </Card>
-  )
+  );
 }
 ```
 
@@ -136,21 +136,21 @@ export function UserCard({ user }) {
 ### 컴포넌트 커스터마이징
 
 ```tsx
-import { Button } from '@/components/ui/button'
-import { cn } from '@/lib/utils'
+import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 
 // ✅ 기존 컴포넌트 확장
 export function CustomButton({ className, ...props }) {
   return (
     <Button
       className={cn(
-        'transition-all duration-200',
-        'hover:-translate-y-0.5 hover:shadow-lg',
+        "transition-all duration-200",
+        "hover:-translate-y-0.5 hover:shadow-lg",
         className
       )}
       {...props}
     />
-  )
+  );
 }
 
 // ❌ 처음부터 새로 만들기
@@ -160,7 +160,7 @@ export function MyButton({ className, ...props }) {
       className="bg-blue-500... px-4 py-2" // 긴 클래스 나열
       {...props}
     />
-  )
+  );
 }
 ```
 
@@ -182,7 +182,7 @@ npx shadcn@latest add
 
 ```tsx
 // providers/theme-provider.tsx
-import { ThemeProvider as NextThemesProvider } from 'next-themes'
+import { ThemeProvider as NextThemesProvider } from "next-themes";
 
 export function ThemeProvider({ children, ...props }) {
   return (
@@ -195,31 +195,31 @@ export function ThemeProvider({ children, ...props }) {
     >
       {children}
     </NextThemesProvider>
-  )
+  );
 }
 ```
 
 ### 테마 토글 컴포넌트
 
 ```tsx
-import { useTheme } from 'next-themes'
-import { Moon, Sun } from 'lucide-react'
-import { Button } from '@/components/ui/button'
+import { useTheme } from "next-themes";
+import { Moon, Sun } from "lucide-react";
+import { Button } from "@/components/ui/button";
 
 export function ThemeToggle() {
-  const { theme, setTheme } = useTheme()
+  const { theme, setTheme } = useTheme();
 
   return (
     <Button
       variant="outline"
       size="icon"
-      onClick={() => setTheme(theme === 'light' ? 'dark' : 'light')}
+      onClick={() => setTheme(theme === "light" ? "dark" : "light")}
     >
-      <Sun className="h-4 w-4 scale-100 rotate-0 transition-all dark:scale-0 dark:-rotate-90" />
-      <Moon className="absolute h-4 w-4 scale-0 rotate-90 transition-all dark:scale-100 dark:rotate-0" />
+      <Sun className="h-4 w-4 rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
+      <Moon className="absolute h-4 w-4 rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" />
       <span className="sr-only">테마 전환</span>
     </Button>
-  )
+  );
 }
 ```
 
@@ -242,25 +242,31 @@ export function ThemeToggle() {
 
 ### CSS 변수 기반 색상
 
-`src/app/globals.css`에 정의된 색상 변수:
+`app/globals.css`의 `@layer base` 안에 HSL 값(`h s% l%`, `hsl()` 래퍼 없음)으로 정의되어 있고, `tailwind.config.ts`에서 `hsl(var(--name))`으로 참조합니다. 라이트/다크(`.dark`) 값을 각각 정의합니다 (neutral 팔레트):
 
 ```css
-:root {
-  --background: 0 0% 100%;
-  --foreground: 224 71.4% 4.1%;
-  --primary: 220.9 39.3% 11%;
-  --primary-foreground: 210 20% 98%;
-  --secondary: 220 14.3% 95.9%;
-  --secondary-foreground: 220.9 39.3% 11%;
-  --muted: 220 14.3% 95.9%;
-  --muted-foreground: 220 8.9% 46.1%;
-  --accent: 220 14.3% 95.9%;
-  --accent-foreground: 220.9 39.3% 11%;
-  --destructive: 0 84.2% 60.2%;
-  --destructive-foreground: 210 20% 98%;
-  --border: 220 13% 91%;
-  --input: 220 13% 91%;
-  --ring: 224 71.4% 4.1%;
+/* app/globals.css (발췌) */
+@layer base {
+  :root {
+    --background: 0 0% 100%;
+    --foreground: 0 0% 3.9%;
+    --primary: 0 0% 9%;
+    --primary-foreground: 0 0% 98%;
+    --secondary: 0 0% 96.1%;
+    --muted: 0 0% 96.1%;
+    --muted-foreground: 0 0% 45.1%;
+    --accent: 0 0% 96.1%;
+    --destructive: 0 84.2% 60.2%;
+    --border: 0 0% 89.8%;
+    --input: 0 0% 89.8%;
+    --ring: 0 0% 3.9%;
+    --radius: 0.5rem;
+  }
+  .dark {
+    --background: 0 0% 3.9%;
+    --foreground: 0 0% 98%;
+    /* ... */
+  }
 }
 ```
 
@@ -283,15 +289,18 @@ export function ThemeToggle() {
 
 ## ✨ 애니메이션 가이드
 
-### tw-animate-css 활용
+### tailwindcss-animate 활용
+
+`tailwindcss-animate` 플러그인은 `tailwind.config.ts`에 이미 등록되어 있어 별도 import가 필요 없습니다.
 
 ```tsx
-import 'tw-animate-css'
+// ✅ tailwindcss-animate 유틸리티 사용
+<div className="animate-in fade-in duration-300">페이드 인</div>
+<div className="animate-in slide-in-from-bottom-2 fade-in">슬라이드 업</div>
 
-// ✅ 내장 애니메이션 사용
-<div className="animate-fadeIn">페이드 인</div>
-<div className="animate-slideUp">슬라이드 업</div>
+// ✅ Tailwind 기본 애니메이션
 <div className="animate-bounce">바운스</div>
+<div className="animate-pulse">펄스</div>
 
 // ✅ Tailwind transition 활용
 <button className="transition-all duration-200 hover:scale-105 hover:shadow-lg">
