@@ -2,8 +2,8 @@
 
 import { RouteError } from "@/components/route-error";
 
-// 전역 에러 경계 (루트 레이아웃 아래 세그먼트 대상)
-export default function GlobalError({
+// 루트 세그먼트 에러 경계 (루트 레이아웃 자체의 오류는 global-error.tsx가 처리)
+export default function RootError({
   reset,
 }: {
   error: Error;
