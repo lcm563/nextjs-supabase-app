@@ -14,7 +14,7 @@
 > 카풀(2차)·정산(3차)은 MVP 범위 밖이며 [MVP 이후 로드맵](#mvp-이후-로드맵)에 정리합니다.
 
 **📅 최종 업데이트**: 2026-10-23
-**📊 진행 상황**: Phase 1·2 완료, Phase 3 대기 중 (4/11 Tasks 완료, 36%)
+**📊 진행 상황**: Phase 1·2 완료, Phase 3 대기 중 (4/14 Tasks 완료, 29%)
 
 ## 개발 워크플로우
 
@@ -96,12 +96,44 @@
   - 가입 시 표시 이름(`display_name`) 입력 및 프로필 연동
   - Playwright MCP로 인증 플로우 E2E 테스트 (비로그인 링크 접근 → 로그인 → 원래 이벤트 복귀)
 
+- **Task 006-1: 소셜 로그인 (Google · Kakao · Naver)**
+  - 사전 준비(사용자 작업): 각 개발자 콘솔에서 앱 생성, Redirect URI에 `https://<project-ref>.supabase.co/auth/v1/callback` 등록, Supabase Dashboard에 Client ID/Secret 입력, Auth URL Configuration의 Redirect URLs에 `http://localhost:3000/auth/callback`·배포 도메인 추가 (키·시크릿은 커밋 금지)
+  - Google·Kakao: Supabase 기본 provider 활성화 (Kakao 이메일은 비즈 앱 심사 전에는 제공되지 않을 수 있으므로 `email`이 없는 계정을 전제)
+  - Naver: 기본 provider가 아니므로 Custom OAuth2 provider `custom:naver`로 등록 (authorize `https://nid.naver.com/oauth2.0/authorize`, token `https://nid.naver.com/oauth2.0/token`, userinfo `https://openapi.naver.com/v1/nid/me`)
+    - ⚠️ Naver userinfo는 `{ response: { id, email, ... } }` 중첩 구조라 클레임 매핑이 안 될 위험 → 첫 단계에서 실제 로그인으로 검증, 실패 시 Route Handler 기반 자체 OAuth 흐름 검토
+  - `app/auth/callback/route.ts`: `exchangeCodeForSession(code)` 후 `sanitizeNext(next)`로 이동, 실패 시 `/auth/error`
+  - 로그인·가입 화면에 소셜 버튼 3종 (`signInWithOAuth({ provider, options: { redirectTo } })`), Task 006의 `next` 보존과 연동
+  - `handle_new_user` 트리거 보강: 표시 이름을 `display_name` → `full_name`/`name`/`nickname` → 이메일 앞부분 → 기본값 순으로 채우고, `avatar_url`도 메타데이터에서 채움 (이메일 없는 계정 대응)
+  - 같은 이메일의 이메일/소셜 계정 연결 동작(Supabase 자동 identity linking) 확인 및 문서화
+  - PRD·DB_SCHEMA.md 반영
+  - 테스트 체크리스트 (Playwright MCP)
+    - [ ] provider별 로그인 → `profiles` 행 생성(표시 이름·아바타) 확인
+    - [ ] 비로그인으로 공유 링크 진입 → 소셜 로그인 → 원래 이벤트로 복귀
+    - [ ] 로그인 취소·동의 거부 시 `/auth/error` 안내
+    - [ ] `next`에 외부 URL(`//evil.com` 등) 주입 시 기본 경로로 대체
+
 - **Task 007: 이벤트 CRUD 구현**
   - Server Action으로 이벤트 생성·수정·삭제 (`lib/supabase/server.ts`의 `createClient()`를 함수 내에서 매번 생성)
   - 서버 측 주최자 권한 재검증 및 zod 입력 검증
   - 이벤트 상세·목록 페이지를 더미 데이터에서 실제 쿼리로 교체
   - 공유 링크(`/events/[id]`) 복사 및 존재하지 않는 ID 처리
   - Playwright MCP로 생성→조회→수정→삭제 E2E 테스트
+
+- **Task 007-1: 이벤트 커버 이미지 (Supabase Storage)**
+  - 마이그레이션: `events.cover_image_path text` 컬럼, 공개 버킷 `event-covers` (파일 5MB 제한, `image/jpeg`·`image/png`·`image/webp`만 허용)
+  - `storage.objects` 정책: 업로드·교체·삭제는 경로 첫 폴더가 `(select auth.uid())`일 때만 (`{user_id}/{uuid}.{ext}`), 조회는 공개 버킷 기본 동작 (경로를 추측할 수 없도록 UUID 파일명)
+  - 업로드: 브라우저 클라이언트(`lib/supabase/client.ts`)로 Storage에 직접 업로드(Server Action 본문 1MB 제한 회피) → 경로만 이벤트 생성·수정 Server Action으로 전달, 서버에서 경로 소유자 재검증
+  - 이미지 교체·제거·이벤트 삭제 시 이전 파일 정리, 복제(`?copy=`) 시 이미지는 복사하지 않음
+  - UI: `EventForm`에 이미지 선택·미리보기·제거, `EventCard` 썸네일, 상세 상단 커버(없으면 기본 배경)
+  - `next/image` 사용, `next.config.ts`의 `images.remotePatterns`에 Supabase Storage 호스트 추가
+  - 파일 형식·크기 클라이언트 검증 (`lib/validations/`)
+  - `get_advisors`(security) 점검, `database.types.ts` 재생성, PRD·DB_SCHEMA.md 반영
+  - 테스트 체크리스트 (Playwright MCP)
+    - [ ] 업로드 → 목록 썸네일·상세 커버 표시
+    - [ ] 5MB 초과·허용 외 형식 거부 안내
+    - [ ] 타인 폴더 경로로 업로드·삭제 시도 차단 (RLS)
+    - [ ] 이미지 교체·제거·이벤트 삭제 시 이전 파일 삭제 확인
+    - [ ] 360px·다크 모드 레이아웃
 
 - **Task 008: 참석 응답·정원·대기자 로직 구현**
   - 응답(참석/불참/미정) upsert Server Action, 사용자당 이벤트별 1건 보장
@@ -125,6 +157,31 @@
   - `수정됨` 배지와 수정 시각 표시 — F-13
   - Playwright MCP로 마감·종료 이벤트 응답 차단 테스트
 
+- **Task 009-1: 관리자 화면 (Admin)**
+  - 권한 모델: `profiles.role text not null default 'user'` (`user | admin`), `public.is_admin()` 함수 (security definer, `set search_path = ''`, stable)
+    - 본인 `role` 수정 금지(컬럼 권한 회수 또는 트리거), 역할 변경은 RPC `admin_set_user_role`로만 (마지막 관리자 해제 방지)
+    - 권한 판단에 `user_metadata`(사용자 수정 가능) 사용 금지, `service_role` 키 미사용
+  - 초기 관리자: `CLAUDE.md`의 관리자 테스트 계정을 데이터 마이그레이션으로 지정 (비밀번호는 문서에 기록하지 않음)
+  - 숨김·신고
+    - `events.hidden_at timestamptz`, `hidden_reason text` — 숨김 이벤트는 주최자·관리자만 조회(RLS), 일반 목록·상세에서 제외, 복구 가능
+    - `event_reports` 테이블 (신고자, 사유, 상태 `open | resolved | dismissed`) — 로그인 사용자는 신고 생성만, 조회·처리는 관리자만
+  - 관리자 RPC (모두 내부에서 `is_admin()` 확인)
+    - `admin_list_users()`: 이메일·가입 방식(provider)·가입일·최근 로그인·역할 (`auth.users` 조인)
+    - `admin_stats()`: 가입자·이벤트·응답 수, 응답률
+    - `admin_set_event_hidden()`: 이벤트 숨김·복구
+  - 이벤트 강제 삭제: events DELETE 정책에 `or (select public.is_admin())` 추가
+  - 라우트 (`app/admin/`)
+    - `layout.tsx`: 서버에서 `is_admin` 확인, 아니면 `notFound()`로 존재 자체를 숨김
+    - `/admin` 통계 대시보드 · `/admin/events` 전체 이벤트(검색·숨김·삭제) · `/admin/users` 사용자(목록·역할 변경) · `/admin/reports` 신고 처리
+  - 헤더·사용자 메뉴에 관리자에게만 "관리자" 링크, 이벤트 상세에 "신고" 버튼(주최자 본인 제외)
+  - `get_advisors` 점검, `database.types.ts` 재생성, PRD·DB_SCHEMA.md 반영
+  - 테스트 체크리스트 (Playwright MCP, 일반 계정·관리자 계정)
+    - [ ] 일반 계정으로 `/admin` 접근 시 404, 관리자 RPC 직접 호출 차단
+    - [ ] 관리자가 이벤트 숨김 → 일반 사용자 목록·상세에서 사라짐 → 복구
+    - [ ] 신고 생성 → 관리자 신고 목록 표시 → 처리(숨김/기각)
+    - [ ] 역할 부여·해제, 마지막 관리자 해제 차단
+    - [ ] 이벤트 강제 삭제 및 통계 수치 확인
+
 - **Task 010: 성능 최적화 및 배포**
   - Server Component 중심 렌더링 점검, 필요한 곳에 Cache Components(`use cache`) 적용
   - 인덱스 추가(`rsvps(event_id)`, `events(host_id, starts_at)`) 및 `get_advisors` 재점검
@@ -138,7 +195,7 @@
 | ---- | ------------------------------------------------------------- |
 | 2차  | **카풀 매칭** — 운전자 좌석 등록, 탑승 신청, 출발지·시간 조율 |
 | 3차  | **정산** — 비용 입력, N분의 1 계산, 입금 확인 체크            |
-| 4차  | 자동 반복 일정, 이메일/푸시 알림, 소셜 로그인                 |
+| 4차  | 자동 반복 일정, 이메일/푸시 알림                              |
 | 5차  | 모임(Group) 단위·멤버 관리, 출석 통계                         |
 
 ## PRD 요구사항 매핑
@@ -151,3 +208,6 @@
 | F-06, F-07, F-08 응답·정원·현황 | Task 004, 008 |
 | F-10~F-14 (P1)                  | Task 009      |
 | 보안(RLS)·성능·접근성           | Task 005, 010 |
+| 추가: 소셜 로그인               | Task 006-1    |
+| 추가: 이벤트 커버 이미지        | Task 007-1    |
+| 추가: 관리자 화면               | Task 009-1    |
