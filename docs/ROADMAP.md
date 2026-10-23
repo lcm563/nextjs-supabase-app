@@ -14,7 +14,7 @@
 > 카풀(2차)·정산(3차)은 MVP 범위 밖이며 [MVP 이후 로드맵](#mvp-이후-로드맵)에 정리합니다.
 
 **📅 최종 업데이트**: 2026-10-23
-**📊 진행 상황**: Phase 1 완료, Phase 2 대기 중 (2/11 Tasks 완료, 18%)
+**📊 진행 상황**: Phase 1·2 완료, Phase 3 대기 중 (4/11 Tasks 완료, 36%)
 
 ## 개발 워크플로우
 
@@ -63,20 +63,20 @@
   - ✅ 서버 액션 입·출력 타입과 에러 응답 규약 정의 (`types/action.ts`, `lib/action-result.ts`)
   - ✅ 완료 기준: 타입 파일 컴파일 통과, 스키마 설계안 문서화
 
-### Phase 2: UI/UX 완성 (더미 데이터 활용)
+### Phase 2: UI/UX 완성 (더미 데이터 활용) ✅
 
-- **Task 003: 공통 컴포넌트 라이브러리 구현**
-  - shadcn/ui 컴포넌트 추가 (`button`, `card`, `input`, `textarea`, `badge`, `dialog`/`alert-dialog`, `sonner`, `avatar`, `tabs`, `form` 등)
-  - 도메인 컴포넌트: `EventCard`, `RsvpButtons`, `AttendeeList`, `CapacityBadge`, `ShareLinkButton`
-  - 더미 데이터 및 목업 유틸리티 작성 (`lib/mock/`)
-  - 다크 모드·접근성(키보드·스크린리더) 기준 적용
+- **Task 003: 공통 컴포넌트 라이브러리 구현** ✅ - 완료
+  - ✅ shadcn/ui 컴포넌트 추가 (`textarea`, `alert-dialog`, `sonner`, `avatar`, `tabs`, `form`, `separator`, `skeleton` + 기존 `button`, `card`, `input`, `badge` 등)
+  - ✅ 도메인 컴포넌트: `EventCard`, `RsvpButtons`, `AttendeeList`, `CapacityBadge`, `ShareLinkButton`, `DeleteEventDialog`
+  - ✅ 더미 데이터 및 목업 유틸리티 작성 (`lib/mock/`, 현재 시각 기준 상대 일시)
+  - ✅ 다크 모드·접근성(키보드·스크린리더) 기준 적용 — `destructive` 토큰을 WCAG AA 대비로 조정
 
-- **Task 004: 모든 페이지 UI 완성**
-  - 이벤트 목록 UI (주최/참여 탭, 다가오는 순, 지난 이벤트 구분) — 더미 데이터
-  - 이벤트 생성/수정 폼 UI (필드별 검증 오류 표시, 복제 시 값 미리 채움)
-  - 이벤트 상세 UI (정원 대비 참석 수, 응답 버튼, 상태별 참여자 목록, 마감·종료 안내)
-  - 삭제 확인 대화상자, 링크 복사 토스트
-  - 360px 모바일 우선 반응형 검증 및 사용자 플로우·네비게이션 완성
+- **Task 004: 모든 페이지 UI 완성** ✅ - 완료
+  - ✅ 이벤트 목록 UI (`?tab=hosting|attending` 탭, 다가오는 순, 지난 이벤트 구분) — 더미 데이터
+  - ✅ 이벤트 생성/수정 폼 UI (`EventForm`, 필드별 검증 오류 표시, `?copy=[id]` 복제 시 값 미리 채움)
+  - ✅ 이벤트 상세 UI (정원 대비 참석 수, 응답 버튼, 상태별 참여자 목록, 마감·종료 안내)
+  - ✅ 삭제 확인 대화상자, 링크 복사 토스트
+  - ✅ 360px·데스크톱 × 라이트·다크 반응형·대비 검증 및 사용자 플로우·키보드 조작 확인 (Playwright MCP)
 
 ### Phase 3: 핵심 기능 구현
 
@@ -90,7 +90,9 @@
 
 - **Task 006: 인증 흐름 보강 및 링크 복귀 구현**
   - `lib/supabase/proxy.ts`: 미인증 리다이렉트 시 원래 경로를 `next` 파라미터로 보존 (`createServerClient`~`getClaims()` 사이에 코드 추가 금지, 새 Response 생성 시 쿠키 복사)
-  - 로그인·가입·이메일 확인(`/auth/confirm`) 성공 후 `next` 경로로 이동, 내부 경로만 허용(오픈 리다이렉트 방지)
+  - 로그인·가입·이메일 확인(`/auth/confirm`) 성공 후 `next` 경로로 이동, 내부 경로만 허용(오픈 리다이렉트 방지) — 검증은 `lib/safe-next.ts`의 `sanitizeNext()` 사용 (`/auth/confirm`은 적용 완료)
+  - 미인증 리다이렉트 응답에 세션 쿠키 복사, 로그인 페이지는 서버에서 `searchParams.next`를 읽어 폼에 전달
+  - 환경 변수 누락 시 프로덕션에서는 인증 검사를 건너뛰지 않도록 변경 (현재 `hasEnvVars` false면 fail-open)
   - 가입 시 표시 이름(`display_name`) 입력 및 프로필 연동
   - Playwright MCP로 인증 플로우 E2E 테스트 (비로그인 링크 접근 → 로그인 → 원래 이벤트 복귀)
 

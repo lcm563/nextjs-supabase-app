@@ -11,7 +11,7 @@
 
 | Path                                    | Role                                                                   |
 | --------------------------------------- | ---------------------------------------------------------------------- |
-| `app/`                                  | Routes (App Router). Existing: `/`, `/auth/*`, `/protected`            |
+| `app/`                                  | Routes (App Router). Existing: `/`, `/auth/*`, `/events/**`            |
 | `app/events/**`                         | Planned: `/events`, `/events/new`, `/events/[id]`, `/events/[id]/edit` |
 | `components/ui/`                        | shadcn/ui primitives ONLY                                              |
 | `components/`                           | Domain/shared components (kebab-case filenames)                        |
@@ -19,8 +19,11 @@
 | `lib/supabase/{server,client,proxy}.ts` | Three Supabase clients (see Supabase Rules)                            |
 | `lib/utils.ts`                          | `cn()`, `hasEnvVars`                                                   |
 | `lib/supabase/database.types.ts`        | Generated types (not yet created)                                      |
-| `types/`                                | Planned: RSVP/event/server-action types                                |
-| `lib/mock/`                             | Planned: dummy data for Phase 2 UI only                                |
+| `types/`                                | Domain types (`event`, `rsvp`) and `ActionResult` (`action`)           |
+| `lib/validations/`                      | zod schemas, KST ↔ UTC (`kstLocalToIso`, `isoToKstLocal`)              |
+| `lib/format.ts`, `lib/event-status.ts`  | KST display formatting; `getEventPhase(event, now)`, RSVP labels       |
+| `lib/safe-next.ts`                      | `sanitizeNext()` — the ONLY way to validate `next` redirect values     |
+| `lib/mock/`                             | Dummy data for Phase 2 UI only (delete when replaced in Task 007/008)  |
 | `proxy.ts` (root)                       | Calls `updateSession()`. Next.js 16: NEVER create `middleware.ts`      |
 | `docs/guides/`                          | Read the matching guide before the related work                        |
 | `shrimp_data/`                          | Task manager data. DO NOT edit manually                                |

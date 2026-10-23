@@ -46,9 +46,13 @@ app/
 │   ├── update-password/page.tsx
 │   ├── error/page.tsx
 │   └── confirm/route.ts    # 이메일 확인 Route Handler
-└── protected/              # 🔒 인증 필요 페이지
+└── events/                 # 🔒 인증 필요 페이지 (이벤트 목록·생성·상세·수정)
     ├── layout.tsx
-    └── page.tsx
+    ├── page.tsx
+    ├── new/page.tsx
+    └── [id]/
+        ├── page.tsx
+        └── edit/page.tsx
 ```
 
 **🚀 App Router 규칙:**
