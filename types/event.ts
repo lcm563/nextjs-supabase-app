@@ -2,7 +2,7 @@
 // 날짜/시간(timestamptz)은 ISO 8601 문자열로 다룬다.
 // 참고: Task 005에서 database.types.ts 생성 후 Row 파생 타입으로 정리 예정
 
-import type { RsvpStatus } from "@/types/rsvp";
+import type { Attendee, RsvpStatus } from "@/types/rsvp";
 
 export type Profile = {
   id: string;
@@ -41,4 +41,16 @@ export type EventInput = Pick<
 // 상태별 응답 인원수를 포함한 이벤트 (목록/상세 표시용)
 export type EventWithCounts = Event & {
   rsvp_counts: Record<RsvpStatus, number>;
+};
+
+// 목록 카드용: 주최자 이름과 현재 사용자의 응답 상태 포함
+export type EventListItem = EventWithCounts & {
+  host: Pick<Profile, "id" | "display_name">;
+  /** 현재 사용자의 응답. 응답하지 않았으면 null */
+  my_status: RsvpStatus | null;
+};
+
+// 상세 화면용: 참여자 현황 포함
+export type EventDetail = EventListItem & {
+  attendees: Attendee[];
 };

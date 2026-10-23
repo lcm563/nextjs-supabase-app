@@ -12,3 +12,13 @@ export type RsvpStatus = (typeof RSVP_STATUSES)[number];
 
 // 사용자가 직접 선택하는 응답. waitlist는 정원 초과 시 서버(DB)가 지정한다.
 export type RsvpChoice = Exclude<RsvpStatus, "waitlist">;
+
+// 참여자 현황 표시용 (rsvps + profiles 조인 결과)
+export type Attendee = {
+  user_id: string;
+  display_name: string;
+  avatar_url: string | null;
+  status: RsvpStatus;
+  /** 마지막 상태 변경 시각. waitlist 순서 기준 */
+  updated_at: string;
+};
