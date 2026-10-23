@@ -14,7 +14,7 @@
 > 카풀(2차)·정산(3차)은 MVP 범위 밖이며 [MVP 이후 로드맵](#mvp-이후-로드맵)에 정리합니다.
 
 **📅 최종 업데이트**: 2026-10-23
-**📊 진행 상황**: Phase 1·2 완료, Phase 3 대기 중 (4/14 Tasks 완료, 29%)
+**📊 진행 상황**: Phase 1·2 추가 기능(소셜 로그인·커버 이미지·관리자) 골격·UI 진행 예정 (4/18 Tasks 완료, 22%)
 
 ## 개발 워크플로우
 
@@ -47,7 +47,7 @@
 
 ## 개발 단계
 
-### Phase 1: 애플리케이션 골격 구축 ✅
+### Phase 1: 애플리케이션 골격 구축 (추가 기능 골격 진행 중)
 
 - **Task 001: 스타터 정리 및 이벤트 라우트 골격 생성** ✅ - 완료
   - ✅ `/instruments` 등 스타터 잔재 공개 경로·예제 코드 제거 (`lib/supabase/proxy.ts`)
@@ -63,7 +63,15 @@
   - ✅ 서버 액션 입·출력 타입과 에러 응답 규약 정의 (`types/action.ts`, `lib/action-result.ts`)
   - ✅ 완료 기준: 타입 파일 컴파일 통과, 스키마 설계안 문서화
 
-### Phase 2: UI/UX 완성 (더미 데이터 활용) ✅
+- **Task 002-1: 추가 기능 골격 구축 (소셜 로그인·커버 이미지·관리자)** - 우선순위
+  - 타입: `Event`에 `cover_image_path`·`hidden_at`·`hidden_reason`, 목록·상세 뷰 모델에 `cover_image_url`, `Profile`에 `role`, 관리자용 `types/admin.ts` (사용자 행·통계·신고)
+  - 상수·검증: `lib/auth/providers.ts`(소셜 provider `google`·`kakao`·`custom:naver`와 라벨), 커버 이미지 파일 검증(5MB, jpeg·png·webp), 신고 입력 검증
+  - 라우트: `app/admin/` 골격(관리자 판정 게이트 + 탭 내비, 대시보드·이벤트·사용자·신고 페이지, loading·error 경계), `app/auth/callback/route.ts`(OAuth 코드 교환 → `sanitizeNext()`)
+  - 개발 모드 전용 역할 전환 쿠키(`lib/mock/role.ts`) — 관리자·일반 사용자 화면 확인용, Task 009-1에서 삭제
+  - [DB_SCHEMA.md](./DB_SCHEMA.md)에 추가 기능 설계안(커버 컬럼·버킷 정책, 역할·`is_admin()`·숨김·신고·관리자 RPC, 소셜 가입 프로필 fallback) 정리
+  - 완료 기준: 새 라우트 접근 가능(관리자 아니면 404), `npm run check-all`·`npm run build` 통과
+
+### Phase 2: UI/UX 완성 (더미 데이터 활용) (추가 기능 UI 진행 중)
 
 - **Task 003: 공통 컴포넌트 라이브러리 구현** ✅ - 완료
   - ✅ shadcn/ui 컴포넌트 추가 (`textarea`, `alert-dialog`, `sonner`, `avatar`, `tabs`, `form`, `separator`, `skeleton` + 기존 `button`, `card`, `input`, `badge` 등)
@@ -77,6 +85,21 @@
   - ✅ 이벤트 상세 UI (정원 대비 참석 수, 응답 버튼, 상태별 참여자 목록, 마감·종료 안내)
   - ✅ 삭제 확인 대화상자, 링크 복사 토스트
   - ✅ 360px·데스크톱 × 라이트·다크 반응형·대비 검증 및 사용자 플로우·키보드 조작 확인 (Playwright MCP)
+
+- **Task 004-1: 소셜 로그인·커버 이미지 UI** — 더미 데이터
+  - 로그인·가입 화면에 Google·카카오·네이버 버튼(목업 동작: 준비 중 안내), 인증 화면 문구 한국어화, OAuth 오류(`access_denied` 등) 안내
+  - 버튼 스타일: Google·카카오는 브랜드 규격 색, 네이버는 흰 배경 + 녹색 로고(대비 4.5:1 충족)
+  - 종목별 더미 커버(`public/mock/covers/`), `EventCover`(카드 썸네일·상세 커버, 없으면 기본 배경)
+  - `EventForm` 커버 이미지 필드(선택·미리보기·교체·제거, 형식·크기 오류 안내), 복제 시 이미지 미복사 안내
+
+- **Task 004-2: 관리자 화면 UI** — 더미 데이터
+  - `/admin` 통계 대시보드, `/admin/events` 전체 이벤트(검색·상태 필터·숨김/복구·강제 삭제), `/admin/users` 사용자(가입 방식·역할 변경, 마지막 관리자 보호), `/admin/reports` 신고 처리
+  - 사용자 메뉴의 "관리자" 링크(관리자만)와 개발용 역할 전환 토글
+  - 이벤트 상세 "신고" 대화상자, 숨김 이벤트 안내 배너(주최자·관리자) / 그 외 사용자 404, 카드 "숨김" 배지
+
+- **Task 004-3: 추가 기능 반응형·접근성·플로우 검증**
+  - 360px·데스크톱 × 라이트·다크에서 인증·이벤트(커버 유무)·관리자 화면 점검 (가로 스크롤·대비·터치 영역·콘솔 오류)
+  - 키보드 흐름: 소셜 버튼, 커버 선택→미리보기→제거, 역할 전환 → 숨김·복구 → 역할 변경 → 신고 처리, 일반 사용자 `/admin`·숨김 이벤트 404
 
 ### Phase 3: 핵심 기능 구현
 
@@ -97,12 +120,13 @@
   - Playwright MCP로 인증 플로우 E2E 테스트 (비로그인 링크 접근 → 로그인 → 원래 이벤트 복귀)
 
 - **Task 006-1: 소셜 로그인 (Google · Kakao · Naver)**
+  - UI·목업은 Task 004-1, 콜백 라우트 골격은 Task 002-1에서 완료 — 이 Task는 실제 provider 연동
   - 사전 준비(사용자 작업): 각 개발자 콘솔에서 앱 생성, Redirect URI에 `https://<project-ref>.supabase.co/auth/v1/callback` 등록, Supabase Dashboard에 Client ID/Secret 입력, Auth URL Configuration의 Redirect URLs에 `http://localhost:3000/auth/callback`·배포 도메인 추가 (키·시크릿은 커밋 금지)
   - Google·Kakao: Supabase 기본 provider 활성화 (Kakao 이메일은 비즈 앱 심사 전에는 제공되지 않을 수 있으므로 `email`이 없는 계정을 전제)
   - Naver: 기본 provider가 아니므로 Custom OAuth2 provider `custom:naver`로 등록 (authorize `https://nid.naver.com/oauth2.0/authorize`, token `https://nid.naver.com/oauth2.0/token`, userinfo `https://openapi.naver.com/v1/nid/me`)
     - ⚠️ Naver userinfo는 `{ response: { id, email, ... } }` 중첩 구조라 클레임 매핑이 안 될 위험 → 첫 단계에서 실제 로그인으로 검증, 실패 시 Route Handler 기반 자체 OAuth 흐름 검토
-  - `app/auth/callback/route.ts`: `exchangeCodeForSession(code)` 후 `sanitizeNext(next)`로 이동, 실패 시 `/auth/error`
-  - 로그인·가입 화면에 소셜 버튼 3종 (`signInWithOAuth({ provider, options: { redirectTo } })`), Task 006의 `next` 보존과 연동
+  - `app/auth/callback/route.ts`(Task 002-1 골격)로 실제 로그인 흐름 검증
+  - 소셜 버튼 목업 동작을 `signInWithOAuth({ provider, options: { redirectTo } })` 호출로 교체, Task 006의 `next` 보존과 연동
   - `handle_new_user` 트리거 보강: 표시 이름을 `display_name` → `full_name`/`name`/`nickname` → 이메일 앞부분 → 기본값 순으로 채우고, `avatar_url`도 메타데이터에서 채움 (이메일 없는 계정 대응)
   - 같은 이메일의 이메일/소셜 계정 연결 동작(Supabase 자동 identity linking) 확인 및 문서화
   - PRD·DB_SCHEMA.md 반영
@@ -120,13 +144,13 @@
   - Playwright MCP로 생성→조회→수정→삭제 E2E 테스트
 
 - **Task 007-1: 이벤트 커버 이미지 (Supabase Storage)**
+  - UI·목업은 Task 004-1에서 완료 — 이 Task는 Storage 연동과 더미 커버(`public/mock/covers/`) 삭제
   - 마이그레이션: `events.cover_image_path text` 컬럼, 공개 버킷 `event-covers` (파일 5MB 제한, `image/jpeg`·`image/png`·`image/webp`만 허용)
   - `storage.objects` 정책: 업로드·교체·삭제는 경로 첫 폴더가 `(select auth.uid())`일 때만 (`{user_id}/{uuid}.{ext}`), 조회는 공개 버킷 기본 동작 (경로를 추측할 수 없도록 UUID 파일명)
   - 업로드: 브라우저 클라이언트(`lib/supabase/client.ts`)로 Storage에 직접 업로드(Server Action 본문 1MB 제한 회피) → 경로만 이벤트 생성·수정 Server Action으로 전달, 서버에서 경로 소유자 재검증
   - 이미지 교체·제거·이벤트 삭제 시 이전 파일 정리, 복제(`?copy=`) 시 이미지는 복사하지 않음
-  - UI: `EventForm`에 이미지 선택·미리보기·제거, `EventCard` 썸네일, 상세 상단 커버(없으면 기본 배경)
-  - `next/image` 사용, `next.config.ts`의 `images.remotePatterns`에 Supabase Storage 호스트 추가
-  - 파일 형식·크기 클라이언트 검증 (`lib/validations/`)
+  - 커버 이미지 필드의 목업 업로드를 실제 Storage 업로드로 교체, 조회 계층에서 `cover_image_path` → 공개 URL 변환
+  - `next.config.ts`의 `images.remotePatterns`에 Supabase Storage 호스트 추가
   - `get_advisors`(security) 점검, `database.types.ts` 재생성, PRD·DB_SCHEMA.md 반영
   - 테스트 체크리스트 (Playwright MCP)
     - [ ] 업로드 → 목록 썸네일·상세 커버 표시
@@ -158,6 +182,7 @@
   - Playwright MCP로 마감·종료 이벤트 응답 차단 테스트
 
 - **Task 009-1: 관리자 화면 (Admin)**
+  - UI·목업은 Task 004-2, 라우트 골격은 Task 002-1에서 완료 — 이 Task는 권한 모델·RPC 연동과 개발용 역할 전환 삭제
   - 권한 모델: `profiles.role text not null default 'user'` (`user | admin`), `public.is_admin()` 함수 (security definer, `set search_path = ''`, stable)
     - 본인 `role` 수정 금지(컬럼 권한 회수 또는 트리거), 역할 변경은 RPC `admin_set_user_role`로만 (마지막 관리자 해제 방지)
     - 권한 판단에 `user_metadata`(사용자 수정 가능) 사용 금지, `service_role` 키 미사용
@@ -170,10 +195,8 @@
     - `admin_stats()`: 가입자·이벤트·응답 수, 응답률
     - `admin_set_event_hidden()`: 이벤트 숨김·복구
   - 이벤트 강제 삭제: events DELETE 정책에 `or (select public.is_admin())` 추가
-  - 라우트 (`app/admin/`)
-    - `layout.tsx`: 서버에서 `is_admin` 확인, 아니면 `notFound()`로 존재 자체를 숨김
-    - `/admin` 통계 대시보드 · `/admin/events` 전체 이벤트(검색·숨김·삭제) · `/admin/users` 사용자(목록·역할 변경) · `/admin/reports` 신고 처리
-  - 헤더·사용자 메뉴에 관리자에게만 "관리자" 링크, 이벤트 상세에 "신고" 버튼(주최자 본인 제외)
+  - 관리자 게이트(`app/admin/layout.tsx`)·사용자 메뉴의 판정을 개발용 역할 쿠키에서 `is_admin()`으로 교체
+  - 관리자 화면 4종과 신고 대화상자의 목업 동작을 RPC·쿼리로 교체
   - `get_advisors` 점검, `database.types.ts` 재생성, PRD·DB_SCHEMA.md 반영
   - 테스트 체크리스트 (Playwright MCP, 일반 계정·관리자 계정)
     - [ ] 일반 계정으로 `/admin` 접근 시 404, 관리자 RPC 직접 호출 차단
@@ -200,14 +223,14 @@
 
 ## PRD 요구사항 매핑
 
-| PRD 기능                        | 담당 Task     |
-| ------------------------------- | ------------- |
-| F-01 회원가입/로그인            | Task 005, 006 |
-| F-02, F-03, F-04, F-09 이벤트   | Task 004, 007 |
-| F-05 로그인 후 원래 링크 복귀   | Task 006      |
-| F-06, F-07, F-08 응답·정원·현황 | Task 004, 008 |
-| F-10~F-14 (P1)                  | Task 009      |
-| 보안(RLS)·성능·접근성           | Task 005, 010 |
-| 추가: 소셜 로그인               | Task 006-1    |
-| 추가: 이벤트 커버 이미지        | Task 007-1    |
-| 추가: 관리자 화면               | Task 009-1    |
+| PRD 기능                        | 담당 Task                |
+| ------------------------------- | ------------------------ |
+| F-01 회원가입/로그인            | Task 005, 006            |
+| F-02, F-03, F-04, F-09 이벤트   | Task 004, 007            |
+| F-05 로그인 후 원래 링크 복귀   | Task 006                 |
+| F-06, F-07, F-08 응답·정원·현황 | Task 004, 008            |
+| F-10~F-14 (P1)                  | Task 009                 |
+| 보안(RLS)·성능·접근성           | Task 005, 010            |
+| 추가: 소셜 로그인               | Task 002-1, 004-1, 006-1 |
+| 추가: 이벤트 커버 이미지        | Task 002-1, 004-1, 007-1 |
+| 추가: 관리자 화면               | Task 002-1, 004-2, 009-1 |
