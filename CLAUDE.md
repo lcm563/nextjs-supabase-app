@@ -159,8 +159,9 @@ import { Button } from "@/components/ui/button";
 
 ### TypeScript 타입
 
-- Supabase 데이터베이스 타입 파일(`lib/supabase/database.types.ts`)은 아직 없음
-- 타입 생성: Supabase MCP의 `generate_typescript_types` 또는 Supabase CLI로 생성하여 위 경로에 저장
+- Supabase 데이터베이스 타입: `lib/supabase/database.types.ts` (생성 파일, 직접 수정 금지). 세 Supabase 클라이언트에 `Database` 제네릭 적용됨
+- 스키마 변경 후 Supabase MCP의 `generate_typescript_types`로 다시 생성하여 위 경로에 저장
+- **테이블 권한**: 이 프로젝트는 `public` 새 테이블에 `anon`·`authenticated` 기본 권한이 없다. 마이그레이션에서 RLS 정책과 함께 필요한 GRANT(가능하면 컬럼 단위)를 명시해야 한다 (`docs/DB_SCHEMA.md` 5장)
 
 ## MCP 서버 설정
 

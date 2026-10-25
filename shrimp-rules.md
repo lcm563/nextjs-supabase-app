@@ -19,7 +19,7 @@
 | `components/tutorial/`                  | Starter leftovers. Remove during Task 001; DO NOT extend               |
 | `lib/supabase/{server,client,proxy}.ts` | Three Supabase clients (see Supabase Rules)                            |
 | `lib/utils.ts`                          | `cn()`, `hasEnvVars`                                                   |
-| `lib/supabase/database.types.ts`        | Generated types (not yet created)                                      |
+| `lib/supabase/database.types.ts`        | Generated types (Task 005). DO NOT edit by hand                        |
 | `types/`                                | Domain types (`event`, `rsvp`, `admin`) and `ActionResult` (`action`)  |
 | `lib/validations/`                      | zod schemas, KST ↔ UTC (`kstLocalToIso`, `isoToKstLocal`)              |
 | `lib/format.ts`, `lib/event-status.ts`  | KST display formatting; `getEventPhase(event, now)`, RSVP labels       |
@@ -56,6 +56,7 @@
 ## Database Rules
 
 - Schema changes ONLY via Supabase MCP `apply_migration`. DO NOT run DDL via `execute_sql`.
+- New `public` tables get NO default privileges for `anon`/`authenticated` in this project. Every migration that adds a table/column MUST also GRANT the minimum privileges (column-level for INSERT/UPDATE). NEVER grant TRUNCATE.
 - Every table MUST have RLS enabled. Policies per PRD §7: profiles (self write), events (authenticated read, host write), rsvps (authenticated read, self write); `rsvps` has `unique(event_id, user_id)`.
 - Capacity check, waitlist assignment, and waitlist promotion MUST run in a DB function (RPC) or trigger inside a transaction. DO NOT implement in app code with read-then-write.
 - `profiles` row creation: `auth.users` insert trigger.
