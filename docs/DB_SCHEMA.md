@@ -204,3 +204,121 @@ grant execute on function public.respond_to_event(uuid, text) to authenticated;
 | 상태별 인원 집계        | `EventWithCounts.rsvp_counts` — Task 005에서 뷰/RPC 형태 확정        |
 
 Task 005에서 `database.types.ts`를 생성하면 `types/`의 행 타입은 생성된 `Tables<"events">` 등에서 파생하도록 바꿉니다.
+
+## 9. 추가 기능 설계안
+
+> 대상: 소셜 로그인 · 이벤트 커버 이미지 · 관리자 화면 (PRD 4장). 작성: Task 002-1b (설계만)
+> 적용 시점: 커버 이미지는 Task 007-1, 소셜 로그인은 Task 006-1, 관리자는 Task 009-1. 적용 후 `get_advisors`로 확인한다.
+
+### 9-1. 이벤트 커버 이미지
+
+```sql
+alter table public.events add column cover_image_path text;  -- null = 커버 없음
+
+-- 공개 버킷: 이벤트 상세 URL을 아는 사람만 이미지를 보게 되므로 공개 읽기로 둔다
+insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+values ('event-covers', 'event-covers', true, 5242880,
+        array['image/jpeg', 'image/png', 'image/webp']);
+```
+
+- 객체 경로: `{uid}/{uuid}.{ext}` — 첫 폴더가 업로드한 사용자 id다. DB에는 경로만 저장하고, 조회 계층이 `getPublicUrl()`로 `EventListItem.cover_image_url`을 채운다.
+- 이미지를 바꾸면 새 경로로 올리고 이전 객체를 지운다(같은 경로 덮어쓰기는 CDN 캐시 때문에 피한다).
+
+| storage.objects 정책 | 조건 (`bucket_id = 'event-covers'` 공통)                                     |
+| -------------------- | ---------------------------------------------------------------------------- |
+| SELECT               | 공개 버킷이라 정책 불필요 (목록 조회 방지를 위해 SELECT 정책은 없음)         |
+| INSERT               | `authenticated`, `(storage.foldername(name))[1] = (select auth.uid())::text` |
+| UPDATE / DELETE      | INSERT와 같은 조건 (본인 폴더만)                                             |
+
+### 9-2. 관리자 역할
+
+```sql
+alter table public.profiles
+  add column role text not null default 'user' check (role in ('user', 'admin'));
+
+create function public.is_admin() returns boolean
+language sql stable security definer set search_path = '' as $$
+  select exists (
+    select 1 from public.profiles
+    where id = (select auth.uid()) and role = 'admin'
+  );
+$$;
+```
+
+- **role 컬럼 보호**: 본인 프로필 UPDATE 정책으로 `role`까지 바꿀 수 없도록 `authenticated`의 `profiles` UPDATE 권한을 컬럼 단위로 다시 준다 (`revoke update on profiles from authenticated; grant update (display_name, avatar_url) on profiles to authenticated;`).
+- **역할 변경**: RPC `admin_set_user_role(target uuid, new_role text)`만 허용. `is_admin()`이 아니면 예외, 마지막 관리자를 `user`로 바꾸려 하면 예외.
+- 권한 판단에 `auth.users.raw_user_meta_data`(사용자가 수정 가능)는 쓰지 않는다. 앱은 `service_role` 키를 쓰지 않는다.
+- 첫 관리자는 마이그레이션에서 지정한다 (관리자 테스트 계정).
+
+### 9-3. 이벤트 숨김
+
+```sql
+alter table public.events
+  add column hidden_at     timestamptz,             -- null = 공개
+  add column hidden_reason text check (char_length(hidden_reason) <= 200);
+```
+
+- events SELECT 정책: `hidden_at is null or host_id = (select auth.uid()) or (select public.is_admin())`. 주최자는 숨겨진 자기 이벤트를 볼 수 있다(숨김 안내 표시).
+- 숨김·해제는 RPC `admin_set_event_hidden(event_id uuid, hidden boolean, reason text)`만 허용. 주최자의 events UPDATE 정책으로 `hidden_*`를 바꾸지 못하게 컬럼 권한을 제한한다(9-2와 같은 방식).
+- 숨겨진 이벤트에는 새 응답을 받지 않는다 (`respond_to_event`에서 검사).
+
+### 9-4. 이벤트 신고
+
+```sql
+create table public.event_reports (
+  id          uuid primary key default gen_random_uuid(),
+  event_id    uuid not null references public.events (id) on delete cascade,
+  reporter_id uuid not null references public.profiles (id) on delete cascade,
+  reason      text not null check (reason in ('spam', 'inappropriate', 'misleading', 'other')),
+  detail      text check (char_length(detail) <= 500),
+  status      text not null default 'open' check (status in ('open', 'resolved', 'dismissed')),
+  created_at  timestamptz not null default now(),
+  resolved_at timestamptz,
+  unique (event_id, reporter_id)   -- 같은 사람이 같은 이벤트를 중복 신고하지 않음
+);
+create index event_reports_open_idx on public.event_reports (created_at) where status = 'open';
+```
+
+| 정책   | 조건                                                                     |
+| ------ | ------------------------------------------------------------------------ |
+| SELECT | `(select public.is_admin())` (신고자 본인도 볼 필요가 없으므로 관리자만) |
+| INSERT | `reporter_id = (select auth.uid())`, `status = 'open'`                   |
+| UPDATE | `(select public.is_admin())` (상태 변경)                                 |
+| DELETE | 없음                                                                     |
+
+### 9-5. 관리자 RPC
+
+모두 `security definer set search_path = ''`, 함수 첫 줄에서 `if not public.is_admin() then raise exception ... end if;`.
+
+| 함수                                               | 반환                                                                      |
+| -------------------------------------------------- | ------------------------------------------------------------------------- |
+| `admin_list_users(search text, page int)`          | `AdminUserRow` 목록. `auth.users`의 email·last_sign_in_at·provider를 조인 |
+| `admin_stats()`                                    | `AdminStats` (json). 이번 주는 한국 시간 월요일 0시 기준                  |
+| `admin_set_event_hidden(event_id, hidden, reason)` | 숨김 처리 + 해당 이벤트의 open 신고를 `resolved`로                        |
+| `admin_set_user_role(target, new_role)`            | 9-2 참고                                                                  |
+
+`auth.users`는 클라이언트에 노출되지 않으므로 관리자 사용자 목록은 반드시 이 RPC로 조회한다.
+
+### 9-6. 소셜 로그인 가입 시 프로필
+
+4장의 `handle_new_user`를 아래 순서의 fallback으로 바꾼다. provider마다 이름 키가 다르다(Google `full_name`·`name`, Kakao `nickname`·`name`, Naver 커스텀 OIDC `name`).
+
+```sql
+insert into public.profiles (id, display_name, avatar_url)
+values (
+  new.id,
+  left(coalesce(
+    nullif(trim(new.raw_user_meta_data ->> 'display_name'), ''),
+    nullif(trim(new.raw_user_meta_data ->> 'full_name'), ''),
+    nullif(trim(new.raw_user_meta_data ->> 'name'), ''),
+    nullif(trim(new.raw_user_meta_data ->> 'nickname'), ''),
+    nullif(split_part(coalesce(new.email, ''), '@', 1), ''),
+    '사용자'
+  ), 50),
+  coalesce(new.raw_user_meta_data ->> 'avatar_url', new.raw_user_meta_data ->> 'picture')
+);
+```
+
+- 카카오는 이메일 동의가 선택이라 `email`이 없을 수 있다 → 마지막 fallback `'사용자'`.
+- `left(..., 50)`으로 `display_name` 길이 제약(1~50자)을 지킨다.
+- 대응 앱 코드: provider 상수 `lib/auth/providers.ts`, 콜백 `app/auth/callback/route.ts`.
