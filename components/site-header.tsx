@@ -27,7 +27,7 @@ export function SiteHeader() {
               <Link
                 key={link.href}
                 href={link.href}
-                className="text-muted-foreground transition-colors hover:text-foreground"
+                className="py-1 text-muted-foreground transition-colors hover:text-foreground"
               >
                 {link.label}
               </Link>

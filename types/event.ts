@@ -2,12 +2,14 @@
 // 날짜/시간(timestamptz)은 ISO 8601 문자열로 다룬다.
 // 참고: Task 005에서 database.types.ts 생성 후 Row 파생 타입으로 정리 예정
 
+import type { UserRole } from "@/types/admin";
 import type { Attendee, RsvpStatus } from "@/types/rsvp";
 
 export type Profile = {
   id: string;
   display_name: string;
   avatar_url: string | null;
+  role: UserRole;
   created_at: string;
 };
 
@@ -22,6 +24,11 @@ export type Event = {
   /** null = 정원 무제한 */
   capacity: number | null;
   rsvp_deadline: string | null;
+  /** Storage 객체 경로. null = 커버 이미지 없음 */
+  cover_image_path: string | null;
+  /** 관리자가 숨긴 시각. null = 공개 */
+  hidden_at: string | null;
+  hidden_reason: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -48,6 +55,8 @@ export type EventListItem = EventWithCounts & {
   host: Pick<Profile, "id" | "display_name">;
   /** 현재 사용자의 응답. 응답하지 않았으면 null */
   my_status: RsvpStatus | null;
+  /** 커버 이미지 공개 URL. 조회 계층이 cover_image_path를 변환해 채운다 */
+  cover_image_url: string | null;
 };
 
 // 상세 화면용: 참여자 현황 포함

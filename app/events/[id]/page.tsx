@@ -1,5 +1,7 @@
 import { AttendeeList } from "@/components/attendee-list";
 import { CapacityBadge } from "@/components/capacity-badge";
+import { EventCover } from "@/components/event-cover";
+import { ReportEventDialog } from "@/components/report-event-dialog";
 import { RsvpButtons } from "@/components/rsvp-buttons";
 import { ShareLinkButton } from "@/components/share-link-button";
 import { Badge } from "@/components/ui/badge";
@@ -10,7 +12,16 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { getEventPhase, isEventEdited } from "@/lib/event-status";
 import { formatDateTime, formatEventSchedule } from "@/lib/format";
 import { MOCK_CURRENT_USER_ID, getMockEventDetail } from "@/lib/mock";
-import { CalendarDays, Clock, Copy, MapPin, Pencil, User } from "lucide-react";
+import { getMockRole } from "@/lib/mock/role";
+import {
+  CalendarDays,
+  Clock,
+  Copy,
+  EyeOff,
+  MapPin,
+  Pencil,
+  User,
+} from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -44,7 +55,9 @@ async function EventDetailContent({
   const { id } = await params;
   await connection();
   const now = new Date();
-  const event = getMockEventDetail(id, now);
+  // TODO(Task 009-1): 숨김 이벤트 노출은 RLS(주최자·is_admin())가 판정
+  const isAdmin = (await getMockRole()) === "admin";
+  const event = getMockEventDetail(id, now, { includeHidden: isAdmin });
   if (!event) notFound();
 
   const phase = getEventPhase(event, now);
@@ -52,9 +65,39 @@ async function EventDetailContent({
   const isFull =
     event.capacity !== null && event.rsvp_counts.going >= event.capacity;
   const edited = isEventEdited(event);
+  const isHidden = event.hidden_at !== null;
 
   return (
     <article className="space-y-6">
+      <EventCover
+        src={event.cover_image_url}
+        alt={`${event.title} 커버 이미지`}
+        variant="hero"
+        priority
+      />
+      {isHidden && (
+        <div
+          role="status"
+          className="flex items-start gap-3 rounded-lg border border-destructive/50 bg-muted p-4 text-sm"
+        >
+          <EyeOff
+            className="mt-0.5 size-4 shrink-0 text-destructive"
+            aria-hidden="true"
+          />
+          <div className="space-y-1">
+            <p className="font-semibold">
+              관리자에 의해 숨김 처리된 이벤트입니다
+            </p>
+            {event.hidden_reason && <p>사유: {event.hidden_reason}</p>}
+            {/* bg-muted 위의 muted 글자는 대비가 부족해 기본 글자색을 쓴다 */}
+            <p>
+              {isHost
+                ? "참여자에게 보이지 않으며 새 응답을 받지 않습니다"
+                : "주최자와 관리자만 볼 수 있습니다"}
+            </p>
+          </div>
+        </div>
+      )}
       <header className="space-y-4">
         <div className="space-y-2">
           <h1 className="break-words text-2xl font-bold">{event.title}</h1>
@@ -104,7 +147,8 @@ async function EventDetailContent({
         </dl>
 
         <div className="flex flex-wrap gap-2">
-          <ShareLinkButton eventId={event.id} />
+          {/* 숨김 이벤트는 참여자가 열 수 없으므로 공유 링크를 숨긴다 */}
+          {!isHidden && <ShareLinkButton eventId={event.id} />}
           {isHost && (
             <>
               <Button asChild variant="outline" size="sm">
@@ -121,6 +165,9 @@ async function EventDetailContent({
               </Button>
             </>
           )}
+          {!isHost && (
+            <ReportEventDialog eventId={event.id} eventTitle={event.title} />
+          )}
         </div>
       </header>
 
@@ -136,12 +183,18 @@ async function EventDetailContent({
               capacity={event.capacity}
               waitlist={event.rsvp_counts.waitlist}
             />
-            <RsvpButtons
-              eventId={event.id}
-              initialStatus={event.my_status}
-              phase={phase}
-              isFull={isFull}
-            />
+            {isHidden ? (
+              <p className="text-sm text-muted-foreground">
+                숨김 처리된 이벤트는 응답을 받지 않습니다
+              </p>
+            ) : (
+              <RsvpButtons
+                eventId={event.id}
+                initialStatus={event.my_status}
+                phase={phase}
+                isFull={isFull}
+              />
+            )}
           </CardContent>
         </Card>
       </section>

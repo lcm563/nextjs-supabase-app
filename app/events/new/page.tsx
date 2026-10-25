@@ -61,7 +61,8 @@ async function NewEventFormContent({
   return (
     <div className="space-y-6">
       <p role="status" className="rounded-lg border bg-muted px-4 py-3 text-sm">
-        ‘{source.title}’ 내용을 복사했습니다. 일시를 새로 지정해주세요
+        ‘{source.title}’ 내용을 복사했습니다. 일시를 새로 지정해주세요. 커버
+        이미지는 복사되지 않습니다
       </p>
       <EventForm mode="create" defaultValues={defaultValues} />
     </div>

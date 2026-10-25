@@ -25,6 +25,8 @@ export const MOCK_PROFILES: Profile[] = NAMES.map((display_name, index) => ({
   id: mockUserId(index + 1),
   display_name,
   avatar_url: null,
+  // 1번(현재 사용자)만 관리자
+  role: index === 0 ? "admin" : "user",
   created_at: CREATED_AT,
 }));
 

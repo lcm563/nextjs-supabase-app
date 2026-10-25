@@ -88,11 +88,13 @@ npm run build       # 빌드 성공 확인
 
 ### 주요 디렉터리
 
-- `types/`: 도메인 타입(`event.ts`, `rsvp.ts`)과 Server Action 결과 규약(`action.ts`)
+- `types/`: 도메인 타입(`event.ts`, `rsvp.ts`, `admin.ts`)과 Server Action 결과 규약(`action.ts`)
 - `lib/validations/`: zod 검증 스키마 (클라이언트 폼 + Server Action 공용), KST ↔ UTC 변환
 - `lib/format.ts`(일시 표시, Asia/Seoul 고정), `lib/event-status.ts`(이벤트 단계 판정), `lib/action-result.ts`(`ok`/`fail`), `lib/safe-next.ts`
-- `lib/mock/`: Phase 2 UI용 더미 데이터 (Task 007/008에서 실제 쿼리로 교체 후 삭제)
-- **공개 경로**: `/`, `/login*`, `/auth/*` (login, sign-up, forgot-password 등) (조건은 `lib/supabase/proxy.ts` 참고)
+- `app/admin/`: 관리자 화면 (대시보드·이벤트·사용자·신고). 레이아웃의 `AdminGate`가 관리자가 아니면 404
+- `lib/auth/`: 소셜 provider 상수(`providers.ts`), 인증 Route Handler 공통 오류 리다이렉트(`error-redirect.ts`)
+- `lib/mock/`: Phase 2 UI용 더미 데이터 (Task 007/008에서 실제 쿼리로 교체 후 삭제). `role.ts`·`role-actions.ts`는 개발 모드 전용 역할 전환 쿠키 (Task 009-1에서 삭제)
+- **공개 경로**: `/`, `/login*`, `/auth/*` (login, sign-up, forgot-password, 소셜 로그인 콜백 `/auth/callback` 등) (조건은 `lib/supabase/proxy.ts` 참고)
 - **인증 확인 라우트**: `/auth/confirm/route.ts`에서 이메일 확인 처리
 
 ### 환경 변수
@@ -189,5 +191,8 @@ import { Button } from "@/components/ui/button";
 
 💡 **상세 규칙은 위 개발 가이드 문서들을 참조하세요**
 
-- 테스트 계정: gymcoding@gmail.com / qwer1234
-- 관리자 테스트 계정: bruce.lean17@gmail.com / qwer1234
+### 로그인이 필요한 브라우저 검증
+
+- 연결된 Supabase 프로젝트의 계정은 사용자 본인 계정(`lcm563@naver.com`) 하나뿐이다. 별도 테스트 계정은 없으며, 비밀번호는 문서에 적지 않는다.
+- 로그인이 필요하면 임의 계정으로 시도하거나 계정을 새로 만들지 말고, 사용자에게 Playwright 브라우저에서 직접 로그인해 달라고 요청한다.
+- 관리자 화면 확인: 실제 관리자 역할(`profiles.role`)은 Task 009-1 전까지 없다. 개발 모드에서 `mock-role=admin` 쿠키(`lib/mock/role.ts`)를 설정해 확인한다.

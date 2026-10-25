@@ -2,6 +2,14 @@
 export { MOCK_CURRENT_USER_ID, MOCK_PROFILES } from "@/lib/mock/profiles";
 export {
   MOCK_EVENT_IDS,
+  getMockAllEvents,
   getMockEventDetail,
   getMockMyEvents,
 } from "@/lib/mock/events";
+export {
+  getMockAdminEvents,
+  getMockAdminStats,
+  getMockAdminUsers,
+  getMockReports,
+  type AdminEventStatusFilter,
+} from "@/lib/mock/admin";

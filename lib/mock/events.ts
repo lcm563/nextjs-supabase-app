@@ -60,6 +60,8 @@ export const MOCK_EVENT_IDS = {
   endedAttended: mockEventId(5), // e. 종료된 이벤트, 내가 참석
   hostedEnded: mockEventId(6), // f. 내가 주최, 종료
   edited: mockEventId(7), // g. 수정됨, 설명 없음, 내 응답 없음
+  hostedHidden: mockEventId(8), // h. 내가 주최, 관리자가 숨김
+  othersHidden: mockEventId(9), // i. 타인 주최(내가 참석), 관리자가 숨김
 } as const;
 
 function buildMockEvents(now: Date): MockEvent[] {
@@ -78,6 +80,9 @@ function buildMockEvents(now: Date): MockEvent[] {
       ends_at: kstAt(now, 3, 8),
       capacity: null,
       rsvp_deadline: kstAt(now, 2, 22),
+      cover_image_path: "running.svg",
+      hidden_at: null,
+      hidden_reason: null,
       created_at: createdAt,
       updated_at: createdAt,
       rsvps: buildRsvps(createdAt, [
@@ -101,6 +106,9 @@ function buildMockEvents(now: Date): MockEvent[] {
       ends_at: kstAt(now, 5, 22),
       capacity: 6,
       rsvp_deadline: null,
+      cover_image_path: "swimming.svg",
+      hidden_at: null,
+      hidden_reason: null,
       created_at: createdAt,
       updated_at: createdAt,
       rsvps: buildRsvps(createdAt, [
@@ -127,6 +135,9 @@ function buildMockEvents(now: Date): MockEvent[] {
       capacity: 10,
       // 최소 7시간 뒤에 시작하므로 마감(3시간 뒤)은 항상 시작 전이다
       rsvp_deadline: addHours(now, 3),
+      cover_image_path: "gym.svg",
+      hidden_at: null,
+      hidden_reason: null,
       created_at: createdAt,
       updated_at: createdAt,
       rsvps: buildRsvps(createdAt, [
@@ -148,6 +159,9 @@ function buildMockEvents(now: Date): MockEvent[] {
       ends_at: kstAt(now, 2, 21),
       capacity: 10,
       rsvp_deadline: addHours(now, -2),
+      cover_image_path: "climbing.svg",
+      hidden_at: null,
+      hidden_reason: null,
       created_at: createdAt,
       updated_at: createdAt,
       rsvps: buildRsvps(createdAt, [
@@ -168,6 +182,9 @@ function buildMockEvents(now: Date): MockEvent[] {
       ends_at: kstAt(now, -5, 8),
       capacity: 8,
       rsvp_deadline: null,
+      cover_image_path: null,
+      hidden_at: null,
+      hidden_reason: null,
       created_at: addDays(now, -10),
       updated_at: addDays(now, -10),
       rsvps: buildRsvps(addDays(now, -10), [
@@ -189,6 +206,9 @@ function buildMockEvents(now: Date): MockEvent[] {
       ends_at: kstAt(now, -12, 22),
       capacity: null,
       rsvp_deadline: null,
+      cover_image_path: null,
+      hidden_at: null,
+      hidden_reason: null,
       created_at: addDays(now, -20),
       updated_at: addDays(now, -20),
       rsvps: buildRsvps(addDays(now, -20), [
@@ -210,11 +230,56 @@ function buildMockEvents(now: Date): MockEvent[] {
       ends_at: kstAt(now, 6, 12),
       capacity: 12,
       rsvp_deadline: null,
+      cover_image_path: "badminton.svg",
+      hidden_at: null,
+      hidden_reason: null,
       created_at: addDays(now, -4),
       updated_at: addDays(now, -2),
       rsvps: buildRsvps(addDays(now, -4), [
         [5, "going"],
         [6, "going"],
+      ]),
+    },
+    {
+      id: MOCK_EVENT_IDS.hostedHidden,
+      host_id: me,
+      title: "새벽 자전거 라이딩",
+      description:
+        "남산 순환로 라이딩 후 아침 식사. 참가 신청은 아래 링크에서 받아요.",
+      location: "남산 북측순환로 입구",
+      starts_at: kstAt(now, 4, 5),
+      ends_at: kstAt(now, 4, 8),
+      capacity: 15,
+      rsvp_deadline: null,
+      cover_image_path: null,
+      hidden_at: addDays(now, -1),
+      hidden_reason: "외부 홍보 링크 포함",
+      created_at: addDays(now, -2),
+      updated_at: addDays(now, -2),
+      rsvps: buildRsvps(addDays(now, -2), [
+        [1, "going"],
+        [4, "going"],
+      ]),
+    },
+    {
+      id: MOCK_EVENT_IDS.othersHidden,
+      host_id: mockUserId(3),
+      title: "주말 등산 모임",
+      description: "북한산 백운대 코스. 회비 계좌는 단톡방에서 안내합니다.",
+      location: "북한산성 탐방지원센터",
+      starts_at: kstAt(now, 7, 8),
+      ends_at: kstAt(now, 7, 15),
+      capacity: 20,
+      rsvp_deadline: null,
+      cover_image_path: null,
+      hidden_at: addHours(now, -5),
+      hidden_reason: "참가비 입금 유도",
+      created_at: addDays(now, -3),
+      updated_at: addDays(now, -3),
+      rsvps: buildRsvps(addDays(now, -3), [
+        [3, "going"],
+        [1, "going"],
+        [2, "maybe"],
       ]),
     },
   ];
@@ -243,6 +308,10 @@ function toListItem({ rsvps, ...event }: MockEvent): EventListItem {
     my_status:
       rsvps.find((rsvp) => rsvp.user_id === MOCK_CURRENT_USER_ID)?.status ??
       null,
+    // TODO(Task 007-1): Storage 공개 URL 변환(getPublicUrl)으로 교체
+    cover_image_url: event.cover_image_path
+      ? `/mock/covers/${event.cover_image_path}`
+      : null,
   };
 }
 
@@ -262,8 +331,17 @@ function toAttendees(rsvps: MockRsvp[]): Attendee[] {
   });
 }
 
+// 숨김 이벤트는 주최자 본인과 관리자만 볼 수 있다 (DB_SCHEMA.md 9-3 SELECT 정책과 같은 규칙)
+function isVisibleTo(event: Event, includeHidden: boolean): boolean {
+  return (
+    event.hidden_at === null ||
+    event.host_id === MOCK_CURRENT_USER_ID ||
+    includeHidden
+  );
+}
+
 // 내 이벤트 목록 (정렬은 페이지에서 한다)
-// hosting: 내가 주최 / attending: 타인 주최 중 내 응답이 불참이 아닌 이벤트
+// hosting: 내가 주최(숨김 포함) / attending: 타인 주최 중 내 응답이 불참이 아니고 숨김이 아닌 이벤트
 export function getMockMyEvents(now: Date): {
   hosting: EventListItem[];
   attending: EventListItem[];
@@ -274,15 +352,27 @@ export function getMockMyEvents(now: Date): {
     attending: items.filter(
       (item) =>
         item.host_id !== MOCK_CURRENT_USER_ID &&
+        item.hidden_at === null &&
         item.my_status !== null &&
         item.my_status !== "not_going"
     ),
   };
 }
 
-// 이벤트 상세. 없는 id면 null (페이지에서 notFound() 처리)
-export function getMockEventDetail(id: string, now: Date): EventDetail | null {
+// 관리자 화면용 전체 이벤트 (숨김 포함)
+export function getMockAllEvents(now: Date): EventListItem[] {
+  return buildMockEvents(now).map(toListItem);
+}
+
+// 이벤트 상세. 없거나 볼 수 없는 숨김 이벤트면 null (페이지에서 notFound() 처리)
+export function getMockEventDetail(
+  id: string,
+  now: Date,
+  options: { includeHidden?: boolean } = {}
+): EventDetail | null {
   const event = buildMockEvents(now).find((item) => item.id === id);
-  if (!event) return null;
+  if (!event || !isVisibleTo(event, options.includeHidden ?? false)) {
+    return null;
+  }
   return { ...toListItem(event), attendees: toAttendees(event.rsvps) };
 }
