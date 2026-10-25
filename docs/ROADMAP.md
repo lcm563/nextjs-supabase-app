@@ -13,8 +13,8 @@
 > 기준 문서: [PRD.md](./PRD.md) · 기술 스택: Next.js 16 (App Router) + Supabase (Auth, Postgres, RLS) + shadcn/ui + Tailwind CSS v3
 > 카풀(2차)·정산(3차)은 MVP 범위 밖이며 [MVP 이후 로드맵](#mvp-이후-로드맵)에 정리합니다.
 
-**📅 최종 업데이트**: 2026-10-23
-**📊 진행 상황**: Phase 1·2 추가 기능(소셜 로그인·커버 이미지·관리자) 골격·UI 진행 예정 (4/18 Tasks 완료, 22%)
+**📅 최종 업데이트**: 2026-10-25
+**📊 진행 상황**: Phase 1·2 완료(추가 기능 골격·UI 포함), Phase 3 대기 중 (8/18 Tasks 완료, 44%)
 
 ## 개발 워크플로우
 
@@ -47,7 +47,7 @@
 
 ## 개발 단계
 
-### Phase 1: 애플리케이션 골격 구축 (추가 기능 골격 진행 중)
+### Phase 1: 애플리케이션 골격 구축 ✅
 
 - **Task 001: 스타터 정리 및 이벤트 라우트 골격 생성** ✅ - 완료
   - ✅ `/instruments` 등 스타터 잔재 공개 경로·예제 코드 제거 (`lib/supabase/proxy.ts`)
@@ -63,15 +63,15 @@
   - ✅ 서버 액션 입·출력 타입과 에러 응답 규약 정의 (`types/action.ts`, `lib/action-result.ts`)
   - ✅ 완료 기준: 타입 파일 컴파일 통과, 스키마 설계안 문서화
 
-- **Task 002-1: 추가 기능 골격 구축 (소셜 로그인·커버 이미지·관리자)** - 우선순위
-  - 타입: `Event`에 `cover_image_path`·`hidden_at`·`hidden_reason`, 목록·상세 뷰 모델에 `cover_image_url`, `Profile`에 `role`, 관리자용 `types/admin.ts` (사용자 행·통계·신고)
-  - 상수·검증: `lib/auth/providers.ts`(소셜 provider `google`·`kakao`·`custom:naver`와 라벨), 커버 이미지 파일 검증(5MB, jpeg·png·webp), 신고 입력 검증
-  - 라우트: `app/admin/` 골격(관리자 판정 게이트 + 탭 내비, 대시보드·이벤트·사용자·신고 페이지, loading·error 경계), `app/auth/callback/route.ts`(OAuth 코드 교환 → `sanitizeNext()`)
-  - 개발 모드 전용 역할 전환 쿠키(`lib/mock/role.ts`) — 관리자·일반 사용자 화면 확인용, Task 009-1에서 삭제
-  - [DB_SCHEMA.md](./DB_SCHEMA.md)에 추가 기능 설계안(커버 컬럼·버킷 정책, 역할·`is_admin()`·숨김·신고·관리자 RPC, 소셜 가입 프로필 fallback) 정리
-  - 완료 기준: 새 라우트 접근 가능(관리자 아니면 404), `npm run check-all`·`npm run build` 통과
+- **Task 002-1: 추가 기능 골격 구축 (소셜 로그인·커버 이미지·관리자)** ✅ - 완료
+  - ✅ 타입: `Event`에 `cover_image_path`·`hidden_at`·`hidden_reason`, 목록·상세 뷰 모델에 `cover_image_url`, `Profile`에 `role`, 관리자용 `types/admin.ts` (사용자 행·통계·신고)
+  - ✅ 상수·검증: `lib/auth/providers.ts`(소셜 provider `google`·`kakao`·`custom:naver`와 라벨), 커버 이미지 파일 검증(5MB, jpeg·png·webp), 신고 입력 검증
+  - ✅ 라우트: `app/admin/` 골격(관리자 판정 게이트 + 탭 내비, 대시보드·이벤트·사용자·신고 페이지, loading·error 경계), `app/auth/callback/route.ts`(OAuth 코드 교환 → `sanitizeNext()`)
+  - ✅ 개발 모드 전용 역할 전환 쿠키(`lib/mock/role.ts`) — 관리자·일반 사용자 화면 확인용, Task 009-1에서 삭제
+  - ✅ [DB_SCHEMA.md](./DB_SCHEMA.md)에 추가 기능 설계안(커버 컬럼·버킷 정책, 역할·`is_admin()`·숨김·신고·관리자 RPC, 소셜 가입 프로필 fallback) 정리
+  - ✅ 완료 기준: 새 라우트 접근 가능(관리자 아니면 404), `npm run check-all`·`npm run build` 통과
 
-### Phase 2: UI/UX 완성 (더미 데이터 활용) (추가 기능 UI 진행 중)
+### Phase 2: UI/UX 완성 (더미 데이터 활용) ✅
 
 - **Task 003: 공통 컴포넌트 라이브러리 구현** ✅ - 완료
   - ✅ shadcn/ui 컴포넌트 추가 (`textarea`, `alert-dialog`, `sonner`, `avatar`, `tabs`, `form`, `separator`, `skeleton` + 기존 `button`, `card`, `input`, `badge` 등)
@@ -86,20 +86,21 @@
   - ✅ 삭제 확인 대화상자, 링크 복사 토스트
   - ✅ 360px·데스크톱 × 라이트·다크 반응형·대비 검증 및 사용자 플로우·키보드 조작 확인 (Playwright MCP)
 
-- **Task 004-1: 소셜 로그인·커버 이미지 UI** — 더미 데이터
-  - 로그인·가입 화면에 Google·카카오·네이버 버튼(목업 동작: 준비 중 안내), 인증 화면 문구 한국어화, OAuth 오류(`access_denied` 등) 안내
-  - 버튼 스타일: Google·카카오는 브랜드 규격 색, 네이버는 흰 배경 + 녹색 로고(대비 4.5:1 충족)
-  - 종목별 더미 커버(`public/mock/covers/`), `EventCover`(카드 썸네일·상세 커버, 없으면 기본 배경)
-  - `EventForm` 커버 이미지 필드(선택·미리보기·교체·제거, 형식·크기 오류 안내), 복제 시 이미지 미복사 안내
+- **Task 004-1: 소셜 로그인·커버 이미지 UI** ✅ - 완료 (더미 데이터)
+  - ✅ 로그인·가입 화면에 Google·카카오·네이버 버튼(목업 동작: 준비 중 안내), 인증 화면 문구 한국어화, OAuth 오류(`access_denied` 등) 안내
+  - ✅ 버튼 스타일: Google·카카오는 브랜드 규격 색, 네이버는 흰 배경 + 녹색 로고(대비 4.5:1 충족)
+  - ✅ 종목별 더미 커버(`public/mock/covers/`), `EventCover`(카드 썸네일·상세 커버, 없으면 기본 배경)
+  - ✅ `EventForm` 커버 이미지 필드(선택·미리보기·교체·제거, 형식·크기 오류 안내), 복제 시 이미지 미복사 안내
 
-- **Task 004-2: 관리자 화면 UI** — 더미 데이터
-  - `/admin` 통계 대시보드, `/admin/events` 전체 이벤트(검색·상태 필터·숨김/복구·강제 삭제), `/admin/users` 사용자(가입 방식·역할 변경, 마지막 관리자 보호), `/admin/reports` 신고 처리
-  - 사용자 메뉴의 "관리자" 링크(관리자만)와 개발용 역할 전환 토글
-  - 이벤트 상세 "신고" 대화상자, 숨김 이벤트 안내 배너(주최자·관리자) / 그 외 사용자 404, 카드 "숨김" 배지
+- **Task 004-2: 관리자 화면 UI** ✅ - 완료 (더미 데이터)
+  - ✅ `/admin` 통계 대시보드, `/admin/events` 전체 이벤트(검색·상태 필터·숨김/복구·강제 삭제), `/admin/users` 사용자(가입 방식·역할 변경, 마지막 관리자 보호), `/admin/reports` 신고 처리
+  - ✅ 사용자 메뉴의 "관리자" 링크(관리자만)와 개발용 역할 전환 토글
+  - ✅ 이벤트 상세 "신고" 대화상자, 숨김 이벤트 안내 배너(주최자·관리자) / 그 외 사용자 404, 카드 "숨김" 배지
 
-- **Task 004-3: 추가 기능 반응형·접근성·플로우 검증**
-  - 360px·데스크톱 × 라이트·다크에서 인증·이벤트(커버 유무)·관리자 화면 점검 (가로 스크롤·대비·터치 영역·콘솔 오류)
-  - 키보드 흐름: 소셜 버튼, 커버 선택→미리보기→제거, 역할 전환 → 숨김·복구 → 역할 변경 → 신고 처리, 일반 사용자 `/admin`·숨김 이벤트 404
+- **Task 004-3: 추가 기능 반응형·접근성·플로우 검증** ✅ - 완료
+  - ✅ 360px·데스크톱 × 라이트·다크에서 인증·이벤트(커버 유무)·관리자 화면 점검 (가로 스크롤·대비·터치 영역·콘솔 오류)
+  - ✅ 키보드 흐름: 소셜 버튼, 커버 선택→미리보기→제거, 역할 전환 → 숨김·복구 → 역할 변경 → 신고 처리, 일반 사용자 `/admin`·숨김 이벤트 404
+  - ✅ 점검 중 수정: 지난 이벤트 카드는 커버만 흐리게(글자 대비 유지), 숨김 배너 글자색, 단독 텍스트 링크 높이 24px 이상(WCAG 2.5.8)
 
 ### Phase 3: 핵심 기능 구현
 
