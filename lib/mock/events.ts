@@ -78,6 +78,9 @@ function buildMockEvents(now: Date): MockEvent[] {
       ends_at: kstAt(now, 3, 8),
       capacity: null,
       rsvp_deadline: kstAt(now, 2, 22),
+      cover_image_path: null,
+      hidden_at: null,
+      hidden_reason: null,
       created_at: createdAt,
       updated_at: createdAt,
       rsvps: buildRsvps(createdAt, [
@@ -101,6 +104,9 @@ function buildMockEvents(now: Date): MockEvent[] {
       ends_at: kstAt(now, 5, 22),
       capacity: 6,
       rsvp_deadline: null,
+      cover_image_path: null,
+      hidden_at: null,
+      hidden_reason: null,
       created_at: createdAt,
       updated_at: createdAt,
       rsvps: buildRsvps(createdAt, [
@@ -127,6 +133,9 @@ function buildMockEvents(now: Date): MockEvent[] {
       capacity: 10,
       // 최소 7시간 뒤에 시작하므로 마감(3시간 뒤)은 항상 시작 전이다
       rsvp_deadline: addHours(now, 3),
+      cover_image_path: null,
+      hidden_at: null,
+      hidden_reason: null,
       created_at: createdAt,
       updated_at: createdAt,
       rsvps: buildRsvps(createdAt, [
@@ -148,6 +157,9 @@ function buildMockEvents(now: Date): MockEvent[] {
       ends_at: kstAt(now, 2, 21),
       capacity: 10,
       rsvp_deadline: addHours(now, -2),
+      cover_image_path: null,
+      hidden_at: null,
+      hidden_reason: null,
       created_at: createdAt,
       updated_at: createdAt,
       rsvps: buildRsvps(createdAt, [
@@ -168,6 +180,9 @@ function buildMockEvents(now: Date): MockEvent[] {
       ends_at: kstAt(now, -5, 8),
       capacity: 8,
       rsvp_deadline: null,
+      cover_image_path: null,
+      hidden_at: null,
+      hidden_reason: null,
       created_at: addDays(now, -10),
       updated_at: addDays(now, -10),
       rsvps: buildRsvps(addDays(now, -10), [
@@ -189,6 +204,9 @@ function buildMockEvents(now: Date): MockEvent[] {
       ends_at: kstAt(now, -12, 22),
       capacity: null,
       rsvp_deadline: null,
+      cover_image_path: null,
+      hidden_at: null,
+      hidden_reason: null,
       created_at: addDays(now, -20),
       updated_at: addDays(now, -20),
       rsvps: buildRsvps(addDays(now, -20), [
@@ -210,6 +228,9 @@ function buildMockEvents(now: Date): MockEvent[] {
       ends_at: kstAt(now, 6, 12),
       capacity: 12,
       rsvp_deadline: null,
+      cover_image_path: null,
+      hidden_at: null,
+      hidden_reason: null,
       created_at: addDays(now, -4),
       updated_at: addDays(now, -2),
       rsvps: buildRsvps(addDays(now, -4), [
@@ -243,6 +264,7 @@ function toListItem({ rsvps, ...event }: MockEvent): EventListItem {
     my_status:
       rsvps.find((rsvp) => rsvp.user_id === MOCK_CURRENT_USER_ID)?.status ??
       null,
+    cover_image_url: null,
   };
 }
 

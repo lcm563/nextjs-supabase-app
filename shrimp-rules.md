@@ -5,7 +5,7 @@
 - Product: 모임 이벤트 관리 웹 MVP (공지 + 참석 응답 관리). Source of truth: `docs/PRD.md`, `docs/ROADMAP.md`, `CLAUDE.md`.
 - Stack: Next.js 16 (App Router, `cacheComponents` enabled), Supabase (`@supabase/ssr`), Tailwind CSS v3, shadcn/ui (new-york), next-themes, lucide-react, TypeScript strict.
 - Domain: `profiles`, `events`, `rsvps`. RSVP status values: `going | not_going | maybe | waitlist`.
-- **MVP excludes**: 카풀, 정산, 소셜 로그인, 푸시/이메일 알림, 자동 반복 일정, Group. DO NOT implement them.
+- **MVP excludes**: 카풀, 정산, 푸시/이메일 알림, 자동 반복 일정, Group. DO NOT implement them.
 
 ## Directory Map
 
@@ -13,17 +13,20 @@
 | --------------------------------------- | ---------------------------------------------------------------------- |
 | `app/`                                  | Routes (App Router). Existing: `/`, `/auth/*`, `/events/**`            |
 | `app/events/**`                         | Planned: `/events`, `/events/new`, `/events/[id]`, `/events/[id]/edit` |
+| `app/admin/**`                          | Admin screens (dashboard, events, users, reports). Admin role only     |
 | `components/ui/`                        | shadcn/ui primitives ONLY                                              |
 | `components/`                           | Domain/shared components (kebab-case filenames)                        |
 | `components/tutorial/`                  | Starter leftovers. Remove during Task 001; DO NOT extend               |
 | `lib/supabase/{server,client,proxy}.ts` | Three Supabase clients (see Supabase Rules)                            |
 | `lib/utils.ts`                          | `cn()`, `hasEnvVars`                                                   |
 | `lib/supabase/database.types.ts`        | Generated types (not yet created)                                      |
-| `types/`                                | Domain types (`event`, `rsvp`) and `ActionResult` (`action`)           |
+| `types/`                                | Domain types (`event`, `rsvp`, `admin`) and `ActionResult` (`action`)  |
 | `lib/validations/`                      | zod schemas, KST ↔ UTC (`kstLocalToIso`, `isoToKstLocal`)              |
 | `lib/format.ts`, `lib/event-status.ts`  | KST display formatting; `getEventPhase(event, now)`, RSVP labels       |
 | `lib/safe-next.ts`                      | `sanitizeNext()` — the ONLY way to validate `next` redirect values     |
+| `lib/auth/`                             | Auth constants (`SOCIAL_PROVIDERS`, `AUTH_PROVIDER_LABELS`)            |
 | `lib/mock/`                             | Dummy data for Phase 2 UI only (delete when replaced in Task 007/008)  |
+| `lib/mock/role.ts`                      | Dev-only role switch cookie (delete in Task 009-1)                     |
 | `proxy.ts` (root)                       | Calls `updateSession()`. Next.js 16: NEVER create `middleware.ts`      |
 | `docs/guides/`                          | Read the matching guide before the related work                        |
 | `shrimp_data/`                          | Task manager data. DO NOT edit manually                                |
@@ -112,7 +115,7 @@
 - Global/module-level Supabase client instances.
 - Code between `createServerClient` and `getClaims()` in `lib/supabase/proxy.ts`.
 - Tables without RLS; DDL through `execute_sql`; skipping `get_advisors`.
-- Implementing 카풀/정산/알림/소셜 로그인/Group in MVP.
+- Implementing 카풀/정산/알림/Group in MVP.
 - Editing `components/ui/*` by hand, `shrimp_data/*`, or `package-lock.json` by hand.
 - Adding Tailwind v4 syntax or new styling libraries.
 - Redirecting to unvalidated `next` values.
