@@ -21,7 +21,8 @@ export function EventCard({ event, isPast }: EventCardProps) {
       href={`/events/${event.id}`}
       className={cn(
         "block rounded-xl border bg-card text-card-foreground shadow-sm transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
-        isPast && "opacity-70"
+        // 지난 이벤트는 커버만 흐리게 해 글자 대비를 유지한다
+        isPast && "[&_img]:opacity-60"
       )}
     >
       {/* 제목이 바로 아래 있으므로 썸네일은 장식용 */}

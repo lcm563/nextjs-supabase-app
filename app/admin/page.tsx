@@ -150,7 +150,7 @@ async function DashboardContent() {
             <CardTitle className="text-base">최근 신고</CardTitle>
             <Link
               href="/admin/reports"
-              className="text-sm text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
+              className="py-0.5 text-sm text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
             >
               전체 보기
             </Link>
@@ -188,7 +188,7 @@ async function DashboardContent() {
             <CardTitle className="text-base">최근 가입</CardTitle>
             <Link
               href="/admin/users"
-              className="text-sm text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
+              className="py-0.5 text-sm text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
             >
               전체 보기
             </Link>

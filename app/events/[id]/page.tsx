@@ -88,12 +88,9 @@ async function EventDetailContent({
             <p className="font-semibold">
               관리자에 의해 숨김 처리된 이벤트입니다
             </p>
-            {event.hidden_reason && (
-              <p className="text-muted-foreground">
-                사유: {event.hidden_reason}
-              </p>
-            )}
-            <p className="text-muted-foreground">
+            {event.hidden_reason && <p>사유: {event.hidden_reason}</p>}
+            {/* bg-muted 위의 muted 글자는 대비가 부족해 기본 글자색을 쓴다 */}
+            <p>
               {isHost
                 ? "참여자에게 보이지 않으며 새 응답을 받지 않습니다"
                 : "주최자와 관리자만 볼 수 있습니다"}

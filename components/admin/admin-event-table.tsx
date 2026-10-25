@@ -159,7 +159,7 @@ export function AdminEventTable({
               <TableCell className="w-full max-w-0">
                 <Link
                   href={`/events/${row.id}`}
-                  className="line-clamp-2 break-words font-medium underline-offset-4 hover:underline"
+                  className="line-clamp-2 break-words py-0.5 font-medium underline-offset-4 hover:underline"
                 >
                   {row.title}
                 </Link>

@@ -76,7 +76,7 @@ export function LoginForm({
                   <Label htmlFor="password">비밀번호</Label>
                   <Link
                     href="/auth/forgot-password"
-                    className="ml-auto inline-block text-sm underline-offset-4 hover:underline"
+                    className="ml-auto inline-block py-0.5 text-sm underline-offset-4 hover:underline"
                   >
                     비밀번호를 잊으셨나요?
                   </Link>
