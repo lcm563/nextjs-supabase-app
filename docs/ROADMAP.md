@@ -211,6 +211,7 @@
   - 인덱스 추가(`rsvps(event_id)`, `events(host_id, starts_at)`) 및 `get_advisors` 재점검
   - `npm run check-all`, `npm run build` 통과 확인
   - Vercel 배포, 환경 변수·Supabase Auth 리다이렉트 URL 설정
+  - 커스텀 SMTP 설정(기본 SMTP는 발송 한도가 낮고 메일 템플릿을 수정할 수 없음) → 가입 확인·비밀번호 재설정 템플릿을 `token_hash` 방식(`{{ .RedirectTo }}&token_hash={{ .TokenHash }}&type=email|recovery`)과 한국어 문구로 변경. 다른 기기에서 링크를 열어도 바로 로그인되며, `/auth/confirm`은 이미 두 방식을 모두 처리한다 (Task 006 결정)
   - 성공 지표(응답률, 링크→응답 전환율, 주최자 재사용) 측정 방안 정리
 
 ## MVP 이후 로드맵

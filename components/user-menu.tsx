@@ -38,7 +38,10 @@ export function UserMenu({ email, isAdmin, showRoleSwitch }: UserMenuProps) {
   const logout = async () => {
     const supabase = createClient();
     await supabase.auth.signOut();
-    router.push("/auth/login");
+    // 전체 페이지 이동: 숨겨진 이전 화면(Activity)과 라우터 캐시에 남은
+    // 로그인 입력값·이전 사용자 데이터를 메모리에서 모두 버린다
+    // eslint-disable-next-line @next/next/no-location-assign-relative-destination -- 클라이언트 이동은 숨겨진 화면 상태를 남기므로 의도적으로 전체 이동
+    window.location.assign("/auth/login");
   };
 
   return (

@@ -16,12 +16,22 @@ import { Separator } from "@/components/ui/separator";
 import { SocialLoginButtons } from "@/components/social-login-buttons";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { emailConfirmUrl, withNext } from "@/lib/safe-next";
+import {
+  DISPLAY_NAME_MAX_LENGTH,
+  displayNameSchema,
+} from "@/lib/validations/profile";
+import { useEffect, useState } from "react";
 
 export function SignUpForm({
+  next,
   className,
   ...props
-}: React.ComponentPropsWithoutRef<"div">) {
+}: React.ComponentPropsWithoutRef<"div"> & {
+  /** 가입 확인 후 이동할 경로. 페이지에서 sanitizeNext로 검증한 값 */
+  next: string;
+}) {
+  const [displayName, setDisplayName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [repeatPassword, setRepeatPassword] = useState("");
@@ -29,11 +39,27 @@ export function SignUpForm({
   const [isLoading, setIsLoading] = useState(false);
   const router = useRouter();
 
+  // 숨겨진 화면(Activity)에 비밀번호가 남지 않도록 화면을 떠날 때 지운다
+  useEffect(
+    () => () => {
+      setPassword("");
+      setRepeatPassword("");
+    },
+    []
+  );
+
   const handleSignUp = async (e: React.SubmitEvent<HTMLFormElement>) => {
     e.preventDefault();
     const supabase = createClient();
     setIsLoading(true);
     setError(null);
+
+    const parsedName = displayNameSchema.safeParse(displayName);
+    if (!parsedName.success) {
+      setError(parsedName.error.issues[0].message);
+      setIsLoading(false);
+      return;
+    }
 
     if (password !== repeatPassword) {
       setError("비밀번호가 일치하지 않습니다");
@@ -46,10 +72,17 @@ export function SignUpForm({
         email,
         password,
         options: {
-          emailRedirectTo: `${window.location.origin}/events`,
+          // handle_new_user 트리거가 profiles.display_name으로 사용한다
+          data: { display_name: parsedName.data },
+          // 확인 링크는 /auth/confirm이 세션을 만든 뒤 next로 보낸다
+          emailRedirectTo: emailConfirmUrl(window.location.origin, next),
         },
       });
       if (error) throw error;
+      setDisplayName("");
+      setEmail("");
+      setPassword("");
+      setRepeatPassword("");
       router.push("/auth/sign-up-success");
     } catch (error: unknown) {
       setError(
@@ -71,9 +104,21 @@ export function SignUpForm({
           <form onSubmit={handleSignUp}>
             <div className="flex flex-col gap-6">
               <div className="grid gap-2">
-                <Label htmlFor="email">이메일</Label>
+                <Label htmlFor="sign-up-display-name">표시 이름</Label>
                 <Input
-                  id="email"
+                  id="sign-up-display-name"
+                  placeholder="참여자 목록에 보일 이름"
+                  autoComplete="nickname"
+                  required
+                  maxLength={DISPLAY_NAME_MAX_LENGTH}
+                  value={displayName}
+                  onChange={(e) => setDisplayName(e.target.value)}
+                />
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="sign-up-email">이메일</Label>
+                <Input
+                  id="sign-up-email"
                   type="email"
                   placeholder="m@example.com"
                   required
@@ -83,10 +128,10 @@ export function SignUpForm({
               </div>
               <div className="grid gap-2">
                 <div className="flex items-center">
-                  <Label htmlFor="password">비밀번호</Label>
+                  <Label htmlFor="sign-up-password">비밀번호</Label>
                 </div>
                 <Input
-                  id="password"
+                  id="sign-up-password"
                   type="password"
                   required
                   value={password}
@@ -95,10 +140,10 @@ export function SignUpForm({
               </div>
               <div className="grid gap-2">
                 <div className="flex items-center">
-                  <Label htmlFor="repeat-password">비밀번호 확인</Label>
+                  <Label htmlFor="sign-up-repeat-password">비밀번호 확인</Label>
                 </div>
                 <Input
-                  id="repeat-password"
+                  id="sign-up-repeat-password"
                   type="password"
                   required
                   value={repeatPassword}
@@ -116,10 +161,13 @@ export function SignUpForm({
             <span className="text-xs text-muted-foreground">또는</span>
             <Separator className="flex-1" />
           </div>
-          <SocialLoginButtons />
+          <SocialLoginButtons next={next} />
           <div className="mt-6 text-center text-sm">
             이미 계정이 있으신가요?{" "}
-            <Link href="/auth/login" className="underline underline-offset-4">
+            <Link
+              href={withNext("/auth/login", next)}
+              className="underline underline-offset-4"
+            >
               로그인
             </Link>
           </div>

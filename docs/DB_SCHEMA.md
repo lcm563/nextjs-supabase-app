@@ -1,7 +1,8 @@
 # DB 스키마 설계안
 
 > 기준: [PRD.md](./PRD.md) 7장 데이터 모델 · 작성: Task 002 (설계만, 구현 제외)
-> 이 문서의 SQL은 **설계안**입니다. 실제 적용은 Task 005에서 Supabase MCP `apply_migration`으로 하고, 적용 후 `get_advisors` → `generate_typescript_types`(`lib/supabase/database.types.ts`) 순서로 진행합니다.
+> 1~5장은 **Task 005에서 적용 완료**(2026-10-25, 마이그레이션 `create_core_tables`·`profiles_on_signup`·`core_rls`·`core_table_grants`). 7장 RPC는 Task 008, 9장은 각 Task에서 적용합니다.
+> 적용 순서: Supabase MCP `apply_migration` → `get_advisors` → `generate_typescript_types`(`lib/supabase/database.types.ts`).
 
 ## 1. 결정 요약
 
@@ -12,7 +13,7 @@
 | 시간 저장   | 모든 일시는 `timestamptz`(UTC 저장). 입력은 한국 시간으로 해석 → [6장](#6-타임존-규약)    |
 | 정원·대기자 | DB 함수 `respond_to_event`가 이벤트 행 잠금 안에서 처리 (앱 코드에서 읽고-쓰기 금지)      |
 | 대기 순서   | 대기자 중 `rsvps.updated_at`이 가장 이른 사람부터 승격 (상태가 바뀔 때만 행이 갱신되므로) |
-| 프로필 생성 | `auth.users` INSERT 트리거 `handle_new_user`                                              |
+| 프로필 생성 | `auth.users` INSERT 트리거 `handle_new_user` (9-6 소셜 fallback 버전으로 적용)            |
 | 보안        | 모든 테이블 RLS 활성화. RSVP 쓰기는 RPC로만 (RLS는 최후 방어선)                           |
 
 ## 2. 테이블
@@ -118,7 +119,8 @@ create trigger on_auth_user_created
 ```
 
 - 표시 이름은 가입 시 `options.data.display_name`으로 받는다(Task 006). 없으면 이메일 앞부분을 쓴다.
-- 이미 가입한 사용자(현재 1명)는 트리거 대상이 아니므로 Task 005 마이그레이션에서 `profiles`를 한 번 채워 넣는다.
+- **적용본은 위 SQL이 아니라 [9-6](#9-6-소셜-로그인-가입-시-프로필)의 fallback 버전**이다(소셜 provider를 추가할 때 다시 만들지 않도록). `handle_new_user`는 `anon`·`authenticated`의 실행 권한을 회수했다.
+- 이미 가입한 사용자 1명은 `profiles_on_signup` 마이그레이션에서 같은 규칙으로 채웠다.
 
 ## 5. RLS 정책
 
@@ -132,7 +134,30 @@ create trigger on_auth_user_created
 
 - `anon` 역할에는 어떤 정책도 주지 않는다. 비로그인 사용자는 proxy가 로그인으로 보낸다.
 - events UPDATE 정책은 `using`과 `with check` 모두 `host_id = (select auth.uid())`로 두어 주최자 변경을 막는다.
-- rsvps의 INSERT/UPDATE 정책이 있어도 앱은 직접 쓰지 않고 `respond_to_event`만 호출한다. 직접 쓰면 정원 판정을 건너뛸 수 있으므로, Task 005에서 rsvps INSERT/UPDATE 정책을 아예 두지 않고 RPC만 열어 두는 방안도 함께 검토한다(권장).
+- **rsvps는 SELECT 정책만 둔다(적용 결정).** 직접 쓰면 정원 판정을 건너뛸 수 있으므로 INSERT/UPDATE/DELETE 정책과 권한이 없고, 쓰기는 `respond_to_event`(security definer)로만 한다. 위 표의 rsvps 쓰기 칸은 적용하지 않았다.
+- profiles INSERT 정책도 두지 않았다(생성은 `handle_new_user` 트리거만).
+
+### 테이블 권한 (GRANT)
+
+이 프로젝트는 `public` 스키마에 새로 만든 테이블에 API 역할(`anon`·`authenticated`)의 기본 권한이 **부여되지 않는다**. RLS 정책만으로는 접근할 수 없어서 `core_table_grants`에서 필요한 권한만 명시적으로 줬다. 새 테이블·컬럼을 추가할 때도 GRANT를 함께 적어야 한다.
+
+| 테이블   | authenticated 권한                                                                                                              |
+| -------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| profiles | SELECT, UPDATE(`display_name`, `avatar_url`)                                                                                    |
+| events   | SELECT, DELETE, INSERT(`host_id` + 입력 컬럼 7개), UPDATE(입력 컬럼 7개) — `id`·`host_id`·시각 컬럼은 클라이언트가 바꿀 수 없음 |
+| rsvps    | SELECT                                                                                                                          |
+
+- `anon`은 권한이 없다. `TRUNCATE`·`REFERENCES`·`TRIGGER`는 회수했다(TRUNCATE는 RLS를 우회한다).
+- Task 007-1의 `cover_image_path`, Task 009-1의 컬럼도 필요하면 컬럼 단위로 GRANT한다. 9-2·9-3의 "컬럼 권한 제한"은 이 방식으로 이미 기본 적용된 상태다.
+
+### 검증 (Task 005)
+
+`execute_sql` 한 번의 DO 블록에서 임시 사용자 3명을 만들고 역할을 바꿔 확인한 뒤, 마지막에 예외를 일으켜 전부 롤백했다(데이터 흔적 없음).
+
+- 트리거 fallback: `display_name`은 그대로, 메타데이터가 없으면 이메일 앞부분, 이메일이 없으면 `nickname`과 `picture`(아바타)
+- 다른 사용자 이벤트 수정·삭제 0행. 다른 사람 명의 생성, `host_id` 변경, `id` 지정 생성, rsvps 직접 쓰기, TRUNCATE 거부
+- 본인 이벤트 생성·수정·삭제와 본인 프로필 수정 허용, 다른 사람 프로필 수정 0행
+- `anon`: events·profiles 조회 권한 없음
 
 ## 6. 타임존 규약
 
@@ -203,7 +228,7 @@ grant execute on function public.respond_to_event(uuid, text) to authenticated;
 | `respond_to_event` 인자 | `rsvpInputSchema` (`lib/validations/rsvp.ts`)                        |
 | 상태별 인원 집계        | `EventWithCounts.rsvp_counts` — Task 005에서 뷰/RPC 형태 확정        |
 
-Task 005에서 `database.types.ts`를 생성하면 `types/`의 행 타입은 생성된 `Tables<"events">` 등에서 파생하도록 바꿉니다.
+`database.types.ts`는 Task 005에서 생성했고, 세 Supabase 클라이언트(`server`·`client`·`proxy`)에 `Database` 제네릭을 적용했다. 다만 앱 타입(`types/event.ts`)에는 아직 DB에 없는 컬럼(`cover_image_path`, `hidden_*`, `role`)이 있어서 조회 계층(`lib/queries/`, Task 007)이 매핑한다. `Tables<"events">` 파생으로 바꾸는 것은 해당 컬럼이 모두 생기는 Task 009-1 이후로 미룬다.
 
 ## 9. 추가 기능 설계안
 

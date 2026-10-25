@@ -29,5 +29,6 @@ export default defineConfig([
     "next-env.d.ts",
     "shrimp_data/**",
     "node_modules/**",
+    ".playwright-mcp/**",
   ]),
 ]);

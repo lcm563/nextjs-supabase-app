@@ -13,7 +13,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 export function UpdatePasswordForm({
   className,
@@ -23,6 +23,9 @@ export function UpdatePasswordForm({
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const router = useRouter();
+
+  // 숨겨진 화면(Activity)에 새 비밀번호가 남지 않도록 화면을 떠날 때 지운다
+  useEffect(() => () => setPassword(""), []);
 
   const handleForgotPassword = async (
     e: React.SubmitEvent<HTMLFormElement>
@@ -35,6 +38,7 @@ export function UpdatePasswordForm({
     try {
       const { error } = await supabase.auth.updateUser({ password });
       if (error) throw error;
+      setPassword("");
       router.push("/events");
     } catch (error: unknown) {
       setError(error instanceof Error ? error.message : "An error occurred");
@@ -56,9 +60,9 @@ export function UpdatePasswordForm({
           <form onSubmit={handleForgotPassword}>
             <div className="flex flex-col gap-6">
               <div className="grid gap-2">
-                <Label htmlFor="password">New password</Label>
+                <Label htmlFor="update-password">New password</Label>
                 <Input
-                  id="password"
+                  id="update-password"
                   type="password"
                   placeholder="New password"
                   required

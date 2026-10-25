@@ -84,6 +84,8 @@ npm run build       # 빌드 성공 확인
 - **Proxy 보호**: 루트 `proxy.ts`는 정적 파일·이미지를 제외한 모든 요청을 가로채서 인증 확인
 - **보호된 라우트**: `/events/**` 등 공개 경로가 아닌 모든 경로는 인증된 사용자만 접근 가능
 - **리다이렉트 경로 검증**: 로그인·이메일 확인 후 이동하는 `next` 값은 반드시 `lib/safe-next.ts`의 `sanitizeNext()`로 검증 (오픈 리다이렉트 방지)
+- **원래 화면 복귀**: proxy가 비로그인 접근을 `/auth/login?next=<경로+쿼리>`로 보내고, 로그인·가입 페이지가 `next`를 서버에서 검증해 폼에 넘긴다. 인증 화면 사이 링크는 `withNext()`로 `next`를 유지
+- **이메일 링크**(가입 확인·비밀번호 재설정): `emailRedirectTo`/`redirectTo`는 `/auth/confirm?next=...`. `/auth/confirm`이 기본 템플릿의 `code`(현재 사용, PKCE라 요청한 브라우저에서만 세션 생성)와 `token_hash`(커스텀 SMTP 설정 후 전환 예정, Task 010)를 모두 처리한다. 다른 기기에서 가입 확인 링크를 열면 인증은 끝난 상태이므로 `/auth/login?notice=email-confirmed&next=...`로 보낸다. 돌아올 주소는 `emailConfirmUrl()`로 만든다(항상 `?next=` 포함)
 - **공유 링크 미리보기**: `/events/[id]`는 로그인이 필요하므로 카카오톡 등 미리보기는 루트 기본 메타데이터 카드로 표시됨 (PRD 8장)
 
 ### 주요 디렉터리
@@ -159,8 +161,9 @@ import { Button } from "@/components/ui/button";
 
 ### TypeScript 타입
 
-- Supabase 데이터베이스 타입 파일(`lib/supabase/database.types.ts`)은 아직 없음
-- 타입 생성: Supabase MCP의 `generate_typescript_types` 또는 Supabase CLI로 생성하여 위 경로에 저장
+- Supabase 데이터베이스 타입: `lib/supabase/database.types.ts` (생성 파일, 직접 수정 금지). 세 Supabase 클라이언트에 `Database` 제네릭 적용됨
+- 스키마 변경 후 Supabase MCP의 `generate_typescript_types`로 다시 생성하여 위 경로에 저장
+- **테이블 권한**: 이 프로젝트는 `public` 새 테이블에 `anon`·`authenticated` 기본 권한이 없다. 마이그레이션에서 RLS 정책과 함께 필요한 GRANT(가능하면 컬럼 단위)를 명시해야 한다 (`docs/DB_SCHEMA.md` 5장)
 
 ## MCP 서버 설정
 
