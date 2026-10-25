@@ -1,16 +1,34 @@
 import type { Database } from "@/lib/supabase/database.types";
 import { createServerClient } from "@supabase/ssr";
+import { sanitizeNext } from "@/lib/safe-next";
 import { NextResponse, type NextRequest } from "next/server";
 import { hasEnvVars } from "../utils";
+
+// 로그인 없이 접근할 수 있는 경로: /, /login*, /auth/*
+function isPublicPath(pathname: string): boolean {
+  return (
+    pathname === "/" ||
+    pathname.startsWith("/login") ||
+    pathname.startsWith("/auth")
+  );
+}
 
 export async function updateSession(request: NextRequest) {
   let supabaseResponse = NextResponse.next({
     request,
   });
 
-  // If the env vars are not set, skip proxy check. You can remove this
-  // once you setup the project.
+  // 환경 변수가 없으면 인증을 확인할 수 없다.
+  // 개발 중에는 설정 전 화면 확인을 위해 통과시키고, 프로덕션에서는 보호 경로를 막는다(fail-closed).
   if (!hasEnvVars) {
+    if (
+      process.env.NODE_ENV === "production" &&
+      !isPublicPath(request.nextUrl.pathname)
+    ) {
+      return new NextResponse("서비스 설정이 완료되지 않았습니다", {
+        status: 503,
+      });
+    }
     return supabaseResponse;
   }
 
@@ -48,16 +66,21 @@ export async function updateSession(request: NextRequest) {
   const { data } = await supabase.auth.getClaims();
   const user = data?.claims;
 
-  if (
-    request.nextUrl.pathname !== "/" &&
-    !user &&
-    !request.nextUrl.pathname.startsWith("/login") &&
-    !request.nextUrl.pathname.startsWith("/auth")
-  ) {
-    // no user, potentially respond by redirecting the user to the login page
+  if (!user && !isPublicPath(request.nextUrl.pathname)) {
+    // 로그인 후 원래 화면으로 돌아오도록 경로+쿼리를 next로 보존한다 (PRD F-05)
     const url = request.nextUrl.clone();
     url.pathname = "/auth/login";
-    return NextResponse.redirect(url);
+    url.search = "";
+    url.searchParams.set(
+      "next",
+      sanitizeNext(request.nextUrl.pathname + request.nextUrl.search)
+    );
+    const redirectResponse = NextResponse.redirect(url);
+    // getClaims()가 갱신·삭제한 세션 쿠키를 리다이렉트 응답에도 옮긴다
+    supabaseResponse.cookies
+      .getAll()
+      .forEach((cookie) => redirectResponse.cookies.set(cookie));
+    return redirectResponse;
   }
 
   // IMPORTANT: You *must* return the supabaseResponse object as it is.
