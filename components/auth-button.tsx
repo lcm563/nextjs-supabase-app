@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { connection } from "next/server";
 import { Button } from "./ui/button";
+import { getMockRole } from "@/lib/mock/role";
 import { createClient } from "@/lib/supabase/server";
 import { UserMenu } from "./user-menu";
 
@@ -16,8 +17,15 @@ export async function AuthButton() {
 
   const user = data?.claims;
 
+  // 컴포넌트의 lib/mock import 예외 (TODO(Task 009-1): is_admin() RPC로 교체)
+  const isAdmin = user ? (await getMockRole()) === "admin" : false;
+
   return user ? (
-    <UserMenu email={user.email ?? ""} />
+    <UserMenu
+      email={user.email ?? ""}
+      isAdmin={isAdmin}
+      showRoleSwitch={process.env.NODE_ENV === "development"}
+    />
   ) : (
     <div className="flex gap-2">
       <Button asChild size="sm" variant={"outline"}>
