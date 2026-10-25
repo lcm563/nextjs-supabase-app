@@ -28,6 +28,7 @@ export function EventCard({ event, isPast }: EventCardProps) {
       <EventCover src={event.cover_image_url} alt="" variant="card" />
       <div className="p-4">
         <div className="flex flex-wrap items-center gap-1.5">
+          {event.hidden_at && <Badge variant="destructive">숨김</Badge>}
           {isPast && <Badge variant="outline">종료</Badge>}
           {event.my_status && (
             <Badge variant="default">
