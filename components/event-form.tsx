@@ -1,5 +1,9 @@
 "use client";
 
+import {
+  CoverImageField,
+  type CoverImageState,
+} from "@/components/cover-image-field";
 import { Button } from "@/components/ui/button";
 import {
   Form,
@@ -20,6 +24,7 @@ import {
 import type { EventInput } from "@/types/event";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useRouter } from "next/navigation";
+import { useState } from "react";
 import { useForm, useWatch, type Control } from "react-hook-form";
 import { toast } from "sonner";
 
@@ -28,6 +33,8 @@ type EventFormProps = {
   defaultValues: EventFormValues;
   /** mode가 edit일 때 필수 */
   eventId?: string;
+  /** 수정 화면의 기존 커버 URL */
+  defaultCoverUrl?: string | null;
 };
 
 // 모의 저장 지연 (Task 007에서 제거)
@@ -43,8 +50,19 @@ function RequiredMark() {
 }
 
 // 이벤트 생성/수정 공용 폼
-export function EventForm({ mode, defaultValues, eventId }: EventFormProps) {
+export function EventForm({
+  mode,
+  defaultValues,
+  eventId,
+  defaultCoverUrl = null,
+}: EventFormProps) {
   const router = useRouter();
+  // 커버는 File이라 react-hook-form 값 대신 별도 상태로 둔다
+  const [cover, setCover] = useState<CoverImageState>(
+    defaultCoverUrl
+      ? { kind: "existing", url: defaultCoverUrl }
+      : { kind: "none" }
+  );
   const form = useForm<EventFormValues, unknown, EventInput>({
     resolver: zodResolver(eventInputSchema),
     defaultValues,
@@ -60,7 +78,12 @@ export function EventForm({ mode, defaultValues, eventId }: EventFormProps) {
     // TODO(Task 007): createEvent/updateEvent Server Action(ActionResult) 호출,
     // 실패 시 error.fieldErrors는 form.setError로 반영
     void values;
-    await new Promise((resolve) => setTimeout(resolve, MOCK_DELAY_MS));
+    // TODO(Task 007-1): 새 파일이면 브라우저 클라이언트로 event-covers/{uid}/{uuid}.{ext}에 업로드한 뒤
+    // 경로를 Server Action에 전달 (제거면 null, 기존 유지면 전달하지 않음)
+    const uploading = cover.kind === "new";
+    await new Promise((resolve) =>
+      setTimeout(resolve, MOCK_DELAY_MS + (uploading ? MOCK_DELAY_MS : 0))
+    );
 
     if (mode === "create") {
       toast.success("이벤트를 만들었습니다");
@@ -78,6 +101,8 @@ export function EventForm({ mode, defaultValues, eventId }: EventFormProps) {
         noValidate
         className="space-y-6"
       >
+        <CoverImageField defaultUrl={defaultCoverUrl} onChange={setCover} />
+
         <FormField
           control={control}
           name="title"

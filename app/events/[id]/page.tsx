@@ -1,5 +1,6 @@
 import { AttendeeList } from "@/components/attendee-list";
 import { CapacityBadge } from "@/components/capacity-badge";
+import { EventCover } from "@/components/event-cover";
 import { RsvpButtons } from "@/components/rsvp-buttons";
 import { ShareLinkButton } from "@/components/share-link-button";
 import { Badge } from "@/components/ui/badge";
@@ -55,6 +56,12 @@ async function EventDetailContent({
 
   return (
     <article className="space-y-6">
+      <EventCover
+        src={event.cover_image_url}
+        alt={`${event.title} 커버 이미지`}
+        variant="hero"
+        priority
+      />
       <header className="space-y-4">
         <div className="space-y-2">
           <h1 className="break-words text-2xl font-bold">{event.title}</h1>

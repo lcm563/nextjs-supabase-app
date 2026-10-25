@@ -46,6 +46,7 @@ async function EditEventContent({
         mode="edit"
         eventId={event.id}
         defaultValues={eventToFormValues(event)}
+        defaultCoverUrl={event.cover_image_url}
       />
       <Separator />
       <section

@@ -78,7 +78,7 @@ function buildMockEvents(now: Date): MockEvent[] {
       ends_at: kstAt(now, 3, 8),
       capacity: null,
       rsvp_deadline: kstAt(now, 2, 22),
-      cover_image_path: null,
+      cover_image_path: "running.svg",
       hidden_at: null,
       hidden_reason: null,
       created_at: createdAt,
@@ -104,7 +104,7 @@ function buildMockEvents(now: Date): MockEvent[] {
       ends_at: kstAt(now, 5, 22),
       capacity: 6,
       rsvp_deadline: null,
-      cover_image_path: null,
+      cover_image_path: "swimming.svg",
       hidden_at: null,
       hidden_reason: null,
       created_at: createdAt,
@@ -133,7 +133,7 @@ function buildMockEvents(now: Date): MockEvent[] {
       capacity: 10,
       // 최소 7시간 뒤에 시작하므로 마감(3시간 뒤)은 항상 시작 전이다
       rsvp_deadline: addHours(now, 3),
-      cover_image_path: null,
+      cover_image_path: "gym.svg",
       hidden_at: null,
       hidden_reason: null,
       created_at: createdAt,
@@ -157,7 +157,7 @@ function buildMockEvents(now: Date): MockEvent[] {
       ends_at: kstAt(now, 2, 21),
       capacity: 10,
       rsvp_deadline: addHours(now, -2),
-      cover_image_path: null,
+      cover_image_path: "climbing.svg",
       hidden_at: null,
       hidden_reason: null,
       created_at: createdAt,
@@ -228,7 +228,7 @@ function buildMockEvents(now: Date): MockEvent[] {
       ends_at: kstAt(now, 6, 12),
       capacity: 12,
       rsvp_deadline: null,
-      cover_image_path: null,
+      cover_image_path: "badminton.svg",
       hidden_at: null,
       hidden_reason: null,
       created_at: addDays(now, -4),
@@ -264,7 +264,10 @@ function toListItem({ rsvps, ...event }: MockEvent): EventListItem {
     my_status:
       rsvps.find((rsvp) => rsvp.user_id === MOCK_CURRENT_USER_ID)?.status ??
       null,
-    cover_image_url: null,
+    // TODO(Task 007-1): Storage 공개 URL 변환(getPublicUrl)으로 교체
+    cover_image_url: event.cover_image_path
+      ? `/mock/covers/${event.cover_image_path}`
+      : null,
   };
 }
 
