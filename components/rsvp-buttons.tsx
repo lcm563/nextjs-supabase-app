@@ -1,5 +1,6 @@
 "use client";
 
+import { respondToEvent } from "@/app/events/[id]/actions";
 import { Button } from "@/components/ui/button";
 import { RSVP_STATUS_LABELS, type EventPhase } from "@/lib/event-status";
 import type { RsvpChoice, RsvpStatus } from "@/types/rsvp";
@@ -11,7 +12,6 @@ type RsvpButtonsProps = {
   initialStatus: RsvpStatus | null;
   /** 서버 페이지에서 현재 시각 기준으로 계산해 넘긴다 */
   phase: EventPhase;
-  isFull: boolean;
 };
 
 const CHOICES: RsvpChoice[] = ["going", "not_going", "maybe"];
@@ -21,15 +21,11 @@ const PHASE_NOTICES: Record<Exclude<EventPhase, "open">, string> = {
   ended: "종료된 이벤트입니다",
 };
 
-// 모의 응답 지연 (Task 008에서 제거)
-const MOCK_DELAY_MS = 300;
-
 // 참석/불참/미정 응답 버튼
 export function RsvpButtons({
   eventId,
   initialStatus,
   phase,
-  isFull,
 }: RsvpButtonsProps) {
   const [status, setStatus] = useState<RsvpStatus | null>(initialStatus);
   const [isPending, startTransition] = useTransition();
@@ -43,17 +39,23 @@ export function RsvpButtons({
     if (disabled || isSelected(choice)) return;
 
     startTransition(async () => {
-      // TODO(Task 008): respondToEvent Server Action 호출로 교체 (eventId, choice)
-      void eventId;
-      await new Promise((resolve) => setTimeout(resolve, MOCK_DELAY_MS));
+      // 대기 여부는 서버(DB)가 정한다. 성공하면 revalidatePath로 정원·참여자 현황이 함께 갱신된다
+      const result = await respondToEvent({
+        event_id: eventId,
+        status: choice,
+      });
+      if (!result.success) {
+        toast.error(result.error.message);
+        return;
+      }
 
-      if (choice === "going" && isFull) {
-        setStatus("waitlist");
+      const next = result.data.status;
+      setStatus(next);
+      if (next === "waitlist") {
         toast.info("정원이 가득 차 대기자로 등록되었습니다");
         return;
       }
-      setStatus(choice);
-      toast.success(`${RSVP_STATUS_LABELS[choice]}으로 응답했습니다`);
+      toast.success(`${RSVP_STATUS_LABELS[next]}으로 응답했습니다`);
     });
   };
 

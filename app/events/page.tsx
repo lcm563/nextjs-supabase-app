@@ -2,16 +2,17 @@ import { EventCard } from "@/components/event-card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { getEventPhase } from "@/lib/event-status";
-import { getMockMyEvents } from "@/lib/mock";
+import { getCurrentUserId, getMyEvents } from "@/lib/queries/events";
 import { cn } from "@/lib/utils";
 import type { EventListItem } from "@/types/event";
 import { Plus } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { connection } from "next/server";
 import { Suspense } from "react";
 
-// 내 이벤트 목록 (데이터는 Task 007에서 실제 쿼리로 교체)
+// 내 이벤트 목록
 
 export const metadata: Metadata = { title: "내 이벤트" };
 
@@ -62,7 +63,9 @@ async function EventListContent({
   await connection();
   const now = new Date();
 
-  const events = getMockMyEvents(now);
+  const userId = await getCurrentUserId();
+  if (!userId) redirect("/auth/login?next=/events");
+  const events = await getMyEvents(userId);
   const { upcoming, past } = splitByPhase(events[activeTab], now);
 
   return (

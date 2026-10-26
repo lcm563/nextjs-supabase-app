@@ -16,6 +16,9 @@ import {
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { EVENT_COVER_BUCKET, buildCoverPath } from "@/lib/storage/event-covers";
+import { createClient } from "@/lib/supabase/client";
+import { createEvent, updateEvent } from "@/app/events/actions";
 import {
   EVENT_LIMITS,
   eventInputSchema,
@@ -37,8 +40,24 @@ type EventFormProps = {
   defaultCoverUrl?: string | null;
 };
 
-// 모의 저장 지연 (Task 007에서 제거)
-const MOCK_DELAY_MS = 400;
+// 브라우저에서 Storage로 직접 올린다 (Server Action 본문 1MB 제한 회피). 실패하면 null
+async function uploadCover(file: File): Promise<string | null> {
+  const supabase = createClient();
+  const { data } = await supabase.auth.getClaims();
+  const userId = data?.claims.sub;
+  if (!userId) return null;
+
+  const path = buildCoverPath(userId, file);
+  const { error } = await supabase.storage
+    .from(EVENT_COVER_BUCKET)
+    .upload(path, file, { contentType: file.type, upsert: false });
+  return error ? null : path;
+}
+
+// 이벤트 저장이 실패하면 방금 올린 객체를 지운다. 이 정리마저 실패하면 고아 파일로 남는다
+async function discardUploadedCover(path: string) {
+  await createClient().storage.from(EVENT_COVER_BUCKET).remove([path]);
+}
 
 function RequiredMark() {
   return (
@@ -74,24 +93,53 @@ export function EventForm({
   const description = useWatch({ control, name: "description" });
   const { isSubmitting } = form.formState;
 
-  const onSubmit = async (values: EventInput) => {
-    // TODO(Task 007): createEvent/updateEvent Server Action(ActionResult) 호출,
-    // 실패 시 error.fieldErrors는 form.setError로 반영
-    void values;
-    // TODO(Task 007-1): 새 파일이면 브라우저 클라이언트로 event-covers/{uid}/{uuid}.{ext}에 업로드한 뒤
-    // 경로를 Server Action에 전달 (제거면 null, 기존 유지면 전달하지 않음)
-    const uploading = cover.kind === "new";
-    await new Promise((resolve) =>
-      setTimeout(resolve, MOCK_DELAY_MS + (uploading ? MOCK_DELAY_MS : 0))
-    );
+  // 클라이언트 검증을 통과한 뒤, 서버가 다시 검증하도록 변환 전 폼 값을 보낸다
+  const onSubmit = async () => {
+    const values = form.getValues();
 
-    if (mode === "create") {
-      toast.success("이벤트를 만들었습니다");
-      router.push("/events");
-    } else {
-      toast.success("변경 사항을 저장했습니다");
-      router.push(`/events/${eventId}`);
+    // 커버: 새 파일이면 업로드한 경로, 기존 커버를 제거했으면 null, 그대로면 undefined(기존 유지)
+    let coverPath: string | null | undefined;
+    if (cover.kind === "new") {
+      const uploaded = await uploadCover(cover.file);
+      if (!uploaded) {
+        toast.error(
+          "커버 이미지를 올리지 못했습니다. 잠시 후 다시 시도해주세요"
+        );
+        return;
+      }
+      coverPath = uploaded;
+    } else if (cover.kind === "none" && defaultCoverUrl) {
+      coverPath = null;
     }
+
+    const input = { ...values, cover_image_path: coverPath };
+    const result =
+      mode === "create"
+        ? await createEvent(input)
+        : await updateEvent(eventId ?? "", input);
+
+    if (!result.success) {
+      if (cover.kind === "new" && coverPath) {
+        await discardUploadedCover(coverPath);
+      }
+      const { message, fieldErrors } = result.error;
+      for (const [name, messages] of Object.entries(fieldErrors ?? {})) {
+        if (name in values && messages[0]) {
+          form.setError(
+            name as keyof EventFormValues,
+            { message: messages[0] },
+            { shouldFocus: true }
+          );
+        }
+      }
+      toast.error(message);
+      return;
+    }
+
+    toast.success(
+      mode === "create" ? "이벤트를 만들었습니다" : "변경 사항을 저장했습니다"
+    );
+    router.push(`/events/${result.data.id}`);
   };
 
   return (

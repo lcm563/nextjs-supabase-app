@@ -1,6 +1,6 @@
 import { EventForm } from "@/components/event-form";
 import { EventFormSkeleton } from "@/components/event-form-skeleton";
-import { getMockEventDetail } from "@/lib/mock";
+import { getCurrentUserId, getEventDetail } from "@/lib/queries/events";
 import {
   emptyEventFormValues,
   eventToFormValues,
@@ -10,7 +10,7 @@ import type { Metadata } from "next";
 import { connection } from "next/server";
 import { Suspense } from "react";
 
-// 이벤트 만들기. ?copy=[id]면 기존 이벤트 내용으로 미리 채운다 (데이터는 Task 007에서 실제 쿼리로 교체)
+// 이벤트 만들기. ?copy=[id]면 기존 이벤트 내용으로 미리 채운다
 
 export const metadata: Metadata = { title: "이벤트 만들기" };
 
@@ -45,7 +45,8 @@ async function NewEventFormContent({
   }
 
   await connection();
-  const source = getMockEventDetail(copy, new Date());
+  const userId = await getCurrentUserId();
+  const source = userId ? await getEventDetail(copy, userId) : null;
   if (!source) {
     return <EventForm mode="create" defaultValues={emptyEventFormValues} />;
   }

@@ -1,0 +1,141 @@
+// 이벤트 조회 계층 (서버 전용: Server Components·Server Actions에서만 import)
+// Supabase 클라이언트는 함수마다 새로 만든다. 접근 범위는 RLS가 판정한다 (DB_SCHEMA.md 5장).
+
+import { getCoverPublicUrl } from "@/lib/storage/event-covers";
+import { createClient } from "@/lib/supabase/server";
+import type { Tables } from "@/lib/supabase/database.types";
+import type { EventDetail, EventListItem } from "@/types/event";
+import { isRsvpStatus, type Attendee, type RsvpStatus } from "@/types/rsvp";
+import { z } from "zod";
+
+const HOST_SELECT = "host:profiles!events_host_id_fkey(id, display_name)";
+const LIST_SELECT = `*, ${HOST_SELECT}, rsvps(user_id, status)` as const;
+const DETAIL_SELECT =
+  `*, ${HOST_SELECT}, rsvps(user_id, status, updated_at, profile:profiles(display_name, avatar_url))` as const;
+
+type RsvpRow = { user_id: string; status: string };
+
+type EventRow<R extends RsvpRow = RsvpRow> = Tables<"events"> & {
+  host: { id: string; display_name: string };
+  rsvps: R[];
+};
+
+type DetailRsvpRow = RsvpRow & {
+  updated_at: string;
+  profile: { display_name: string; avatar_url: string | null };
+};
+
+type Supabase = Awaited<ReturnType<typeof createClient>>;
+
+const uuidSchema = z.uuid();
+
+function toListItem(
+  supabase: Supabase,
+  { rsvps, ...event }: EventRow,
+  userId: string
+): EventListItem {
+  const counts: Record<RsvpStatus, number> = {
+    going: 0,
+    not_going: 0,
+    maybe: 0,
+    waitlist: 0,
+  };
+  let myStatus: RsvpStatus | null = null;
+  for (const rsvp of rsvps) {
+    if (!isRsvpStatus(rsvp.status)) continue;
+    counts[rsvp.status] += 1;
+    if (rsvp.user_id === userId) myStatus = rsvp.status;
+  }
+
+  return {
+    ...event,
+    rsvp_counts: counts,
+    my_status: myStatus,
+    cover_image_url: getCoverPublicUrl(supabase, event.cover_image_path),
+    // TODO(Task 009-1): 숨김 컬럼 추가 후 실제 값 사용
+    hidden_at: null,
+    hidden_reason: null,
+  };
+}
+
+function toAttendees(rsvps: DetailRsvpRow[]): Attendee[] {
+  return rsvps.flatMap((rsvp) =>
+    isRsvpStatus(rsvp.status)
+      ? [
+          {
+            user_id: rsvp.user_id,
+            display_name: rsvp.profile.display_name,
+            avatar_url: rsvp.profile.avatar_url,
+            status: rsvp.status,
+            updated_at: rsvp.updated_at,
+          },
+        ]
+      : []
+  );
+}
+
+// 로그인 사용자 id. 세션이 없으면 null
+export async function getCurrentUserId(): Promise<string | null> {
+  const supabase = await createClient();
+  const { data } = await supabase.auth.getClaims();
+  return data?.claims.sub ?? null;
+}
+
+// 내 이벤트 목록 (정렬은 페이지에서 한다)
+// hosting: 내가 주최 / attending: 타인 주최 중 내 응답이 불참이 아닌 이벤트
+export async function getMyEvents(userId: string): Promise<{
+  hosting: EventListItem[];
+  attending: EventListItem[];
+}> {
+  const supabase = await createClient();
+
+  const [hostingResult, myRsvpsResult] = await Promise.all([
+    supabase.from("events").select(LIST_SELECT).eq("host_id", userId),
+    supabase
+      .from("rsvps")
+      .select("event_id")
+      .eq("user_id", userId)
+      .neq("status", "not_going"),
+  ]);
+  if (hostingResult.error) throw hostingResult.error;
+  if (myRsvpsResult.error) throw myRsvpsResult.error;
+
+  const attendingIds = myRsvpsResult.data.map((rsvp) => rsvp.event_id);
+  let attendingRows: EventRow[] = [];
+  if (attendingIds.length > 0) {
+    const { data, error } = await supabase
+      .from("events")
+      .select(LIST_SELECT)
+      .in("id", attendingIds)
+      .neq("host_id", userId);
+    if (error) throw error;
+    attendingRows = data;
+  }
+
+  return {
+    hosting: hostingResult.data.map((row) => toListItem(supabase, row, userId)),
+    attending: attendingRows.map((row) => toListItem(supabase, row, userId)),
+  };
+}
+
+// 이벤트 상세. 잘못된 id이거나 없으면 null (페이지에서 notFound() 처리)
+export async function getEventDetail(
+  id: string,
+  userId: string
+): Promise<EventDetail | null> {
+  if (!uuidSchema.safeParse(id).success) return null;
+
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("events")
+    .select(DETAIL_SELECT)
+    .eq("id", id)
+    .maybeSingle();
+  if (error) throw error;
+  if (!data) return null;
+
+  return {
+    ...toListItem(supabase, data, userId),
+    attendees: toAttendees(data.rsvps),
+  };
+}

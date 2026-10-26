@@ -11,8 +11,7 @@ import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
 import { getEventPhase, isEventEdited } from "@/lib/event-status";
 import { formatDateTime, formatEventSchedule } from "@/lib/format";
-import { MOCK_CURRENT_USER_ID, getMockEventDetail } from "@/lib/mock";
-import { getMockRole } from "@/lib/mock/role";
+import { getCurrentUserId, getEventDetail } from "@/lib/queries/events";
 import {
   CalendarDays,
   Clock,
@@ -24,11 +23,11 @@ import {
 } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { connection } from "next/server";
 import { Suspense } from "react";
 
-// 이벤트 상세 (데이터는 Task 007에서 실제 쿼리로 교체)
+// 이벤트 상세
 // 공유 미리보기는 루트 기본 카드를 쓰므로 generateMetadata를 두지 않는다 (PRD 8장)
 
 export const metadata: Metadata = { title: "이벤트 상세" };
@@ -55,16 +54,16 @@ async function EventDetailContent({
   const { id } = await params;
   await connection();
   const now = new Date();
-  // TODO(Task 009-1): 숨김 이벤트 노출은 RLS(주최자·is_admin())가 판정
-  const isAdmin = (await getMockRole()) === "admin";
-  const event = getMockEventDetail(id, now, { includeHidden: isAdmin });
+  const userId = await getCurrentUserId();
+  if (!userId) redirect(`/auth/login?next=/events/${encodeURIComponent(id)}`);
+  const event = await getEventDetail(id, userId);
   if (!event) notFound();
 
   const phase = getEventPhase(event, now);
-  const isHost = event.host.id === MOCK_CURRENT_USER_ID;
-  const isFull =
-    event.capacity !== null && event.rsvp_counts.going >= event.capacity;
+  const isHost = event.host.id === userId;
   const edited = isEventEdited(event);
+  // TODO(Task 009-1): 숨김 컬럼 추가 전까지 hidden_at은 항상 null이라 배너가 렌더링되지 않는다.
+  // 숨김 이벤트 노출 범위는 RLS(주최자·is_admin())가 판정한다.
   const isHidden = event.hidden_at !== null;
 
   return (
@@ -192,7 +191,6 @@ async function EventDetailContent({
                 eventId={event.id}
                 initialStatus={event.my_status}
                 phase={phase}
-                isFull={isFull}
               />
             )}
           </CardContent>
@@ -222,10 +220,7 @@ async function EventDetailContent({
         <h2 id="attendees-heading" className="text-lg font-semibold">
           참여자 현황
         </h2>
-        <AttendeeList
-          attendees={event.attendees}
-          currentUserId={MOCK_CURRENT_USER_ID}
-        />
+        <AttendeeList attendees={event.attendees} currentUserId={userId} />
       </section>
     </article>
   );

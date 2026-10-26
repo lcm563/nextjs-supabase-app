@@ -1,4 +1,4 @@
-// Phase 2 UI 전용 더미 이벤트·응답. Task 007/008에서 실제 쿼리로 교체 후 삭제한다.
+// 관리자 화면 mock(lib/mock/admin.ts)이 쓰는 더미 이벤트·응답. Task 009-1에서 삭제한다.
 // 일시는 호출 시점(now) 기준 상대값으로 만든다. 모듈 최상위에서 현재 시각을 읽지 않는다.
 
 import {
@@ -6,8 +6,8 @@ import {
   MOCK_PROFILES,
   mockUserId,
 } from "@/lib/mock/profiles";
-import type { Event, EventDetail, EventListItem } from "@/types/event";
-import type { Attendee, RsvpStatus } from "@/types/rsvp";
+import type { Event, EventListItem } from "@/types/event";
+import type { RsvpStatus } from "@/types/rsvp";
 
 type MockRsvp = { user_id: string; status: RsvpStatus; updated_at: string };
 type MockEvent = Event & { rsvps: MockRsvp[] };
@@ -80,7 +80,7 @@ function buildMockEvents(now: Date): MockEvent[] {
       ends_at: kstAt(now, 3, 8),
       capacity: null,
       rsvp_deadline: kstAt(now, 2, 22),
-      cover_image_path: "running.svg",
+      cover_image_path: null,
       hidden_at: null,
       hidden_reason: null,
       created_at: createdAt,
@@ -106,7 +106,7 @@ function buildMockEvents(now: Date): MockEvent[] {
       ends_at: kstAt(now, 5, 22),
       capacity: 6,
       rsvp_deadline: null,
-      cover_image_path: "swimming.svg",
+      cover_image_path: null,
       hidden_at: null,
       hidden_reason: null,
       created_at: createdAt,
@@ -135,7 +135,7 @@ function buildMockEvents(now: Date): MockEvent[] {
       capacity: 10,
       // 최소 7시간 뒤에 시작하므로 마감(3시간 뒤)은 항상 시작 전이다
       rsvp_deadline: addHours(now, 3),
-      cover_image_path: "gym.svg",
+      cover_image_path: null,
       hidden_at: null,
       hidden_reason: null,
       created_at: createdAt,
@@ -159,7 +159,7 @@ function buildMockEvents(now: Date): MockEvent[] {
       ends_at: kstAt(now, 2, 21),
       capacity: 10,
       rsvp_deadline: addHours(now, -2),
-      cover_image_path: "climbing.svg",
+      cover_image_path: null,
       hidden_at: null,
       hidden_reason: null,
       created_at: createdAt,
@@ -230,7 +230,7 @@ function buildMockEvents(now: Date): MockEvent[] {
       ends_at: kstAt(now, 6, 12),
       capacity: 12,
       rsvp_deadline: null,
-      cover_image_path: "badminton.svg",
+      cover_image_path: null,
       hidden_at: null,
       hidden_reason: null,
       created_at: addDays(now, -4),
@@ -308,71 +308,12 @@ function toListItem({ rsvps, ...event }: MockEvent): EventListItem {
     my_status:
       rsvps.find((rsvp) => rsvp.user_id === MOCK_CURRENT_USER_ID)?.status ??
       null,
-    // TODO(Task 007-1): Storage 공개 URL 변환(getPublicUrl)으로 교체
-    cover_image_url: event.cover_image_path
-      ? `/mock/covers/${event.cover_image_path}`
-      : null,
-  };
-}
-
-function toAttendees(rsvps: MockRsvp[]): Attendee[] {
-  return rsvps.flatMap((rsvp) => {
-    const profile = MOCK_PROFILES.find((p) => p.id === rsvp.user_id);
-    if (!profile) return [];
-    return [
-      {
-        user_id: rsvp.user_id,
-        display_name: profile.display_name,
-        avatar_url: profile.avatar_url,
-        status: rsvp.status,
-        updated_at: rsvp.updated_at,
-      },
-    ];
-  });
-}
-
-// 숨김 이벤트는 주최자 본인과 관리자만 볼 수 있다 (DB_SCHEMA.md 9-3 SELECT 정책과 같은 규칙)
-function isVisibleTo(event: Event, includeHidden: boolean): boolean {
-  return (
-    event.hidden_at === null ||
-    event.host_id === MOCK_CURRENT_USER_ID ||
-    includeHidden
-  );
-}
-
-// 내 이벤트 목록 (정렬은 페이지에서 한다)
-// hosting: 내가 주최(숨김 포함) / attending: 타인 주최 중 내 응답이 불참이 아니고 숨김이 아닌 이벤트
-export function getMockMyEvents(now: Date): {
-  hosting: EventListItem[];
-  attending: EventListItem[];
-} {
-  const items = buildMockEvents(now).map(toListItem);
-  return {
-    hosting: items.filter((item) => item.host_id === MOCK_CURRENT_USER_ID),
-    attending: items.filter(
-      (item) =>
-        item.host_id !== MOCK_CURRENT_USER_ID &&
-        item.hidden_at === null &&
-        item.my_status !== null &&
-        item.my_status !== "not_going"
-    ),
+    // 더미 커버는 Task 007-1b에서 삭제했다. 관리자 화면 mock은 커버를 쓰지 않는다
+    cover_image_url: null,
   };
 }
 
 // 관리자 화면용 전체 이벤트 (숨김 포함)
 export function getMockAllEvents(now: Date): EventListItem[] {
   return buildMockEvents(now).map(toListItem);
-}
-
-// 이벤트 상세. 없거나 볼 수 없는 숨김 이벤트면 null (페이지에서 notFound() 처리)
-export function getMockEventDetail(
-  id: string,
-  now: Date,
-  options: { includeHidden?: boolean } = {}
-): EventDetail | null {
-  const event = buildMockEvents(now).find((item) => item.id === id);
-  if (!event || !isVisibleTo(event, options.includeHidden ?? false)) {
-    return null;
-  }
-  return { ...toListItem(event), attendees: toAttendees(event.rsvps) };
 }

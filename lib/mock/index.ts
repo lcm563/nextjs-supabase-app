@@ -1,11 +1,4 @@
-// Phase 2 UI 전용 더미 데이터. Task 007/008에서 실제 쿼리로 교체 후 삭제한다.
-export { MOCK_CURRENT_USER_ID, MOCK_PROFILES } from "@/lib/mock/profiles";
-export {
-  MOCK_EVENT_IDS,
-  getMockAllEvents,
-  getMockEventDetail,
-  getMockMyEvents,
-} from "@/lib/mock/events";
+// 관리자 화면 전용 더미 데이터 (이벤트 화면은 lib/queries/로 교체 완료). Task 009-1에서 실제 RPC로 교체 후 삭제한다.
 export {
   getMockAdminEvents,
   getMockAdminStats,
