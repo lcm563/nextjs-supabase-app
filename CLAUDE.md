@@ -92,10 +92,13 @@ npm run build       # 빌드 성공 확인
 
 - `types/`: 도메인 타입(`event.ts`, `rsvp.ts`, `admin.ts`)과 Server Action 결과 규약(`action.ts`)
 - `lib/validations/`: zod 검증 스키마 (클라이언트 폼 + Server Action 공용), KST ↔ UTC 변환
-- `lib/format.ts`(일시 표시, Asia/Seoul 고정), `lib/event-status.ts`(이벤트 단계 판정), `lib/action-result.ts`(`ok`/`fail`), `lib/safe-next.ts`
+- `lib/format.ts`(일시 표시, Asia/Seoul 고정), `lib/event-status.ts`(이벤트 단계 판정), `lib/action-result.ts`(`ok`/`fail`/`failWith`, 오류 코드별 한국어 안내 `ACTION_ERROR_MESSAGES`), `lib/safe-next.ts`
+- `lib/queries/`: 서버 전용 조회 계층(`events.ts`: 내 이벤트 목록·상세, 응답 집계, 커버 공개 URL). 접근 범위는 RLS가 판정
+- `lib/storage/event-covers.ts`: 커버 이미지 Storage 경로·소유자 검사·공개 URL 헬퍼 (버킷 `event-covers`, 경로 `{uid}/{uuid}.{ext}`)
+- Server Action: `app/events/actions.ts`(이벤트 생성·수정·삭제, 커버 경로 저장·이전 파일 정리), `app/events/[id]/actions.ts`(참석 응답 → RPC `respond_to_event`)
 - `app/admin/`: 관리자 화면 (대시보드·이벤트·사용자·신고). 레이아웃의 `AdminGate`가 관리자가 아니면 404
-- `lib/auth/`: 소셜 provider 상수(`providers.ts`), 인증 Route Handler 공통 오류 리다이렉트(`error-redirect.ts`)
-- `lib/mock/`: Phase 2 UI용 더미 데이터 (Task 007/008에서 실제 쿼리로 교체 후 삭제). `role.ts`·`role-actions.ts`는 개발 모드 전용 역할 전환 쿠키 (Task 009-1에서 삭제)
+- `lib/auth/`: 소셜 provider 상수·활성화 판정·로그인 화면 노출 목록(`providers.ts`, 네이버는 MVP 이후 과제라 숨김), 인증 Route Handler 공통 오류 리다이렉트(`error-redirect.ts`)
+- `lib/mock/`: **관리자 화면 전용** 더미 데이터 (이벤트 화면은 실제 쿼리로 교체 완료, Task 009-1에서 RPC로 교체 후 삭제). `role.ts`·`role-actions.ts`는 개발 모드 전용 역할 전환 쿠키 (Task 009-1에서 삭제)
 - **공개 경로**: `/`, `/login*`, `/auth/*` (login, sign-up, forgot-password, 소셜 로그인 콜백 `/auth/callback` 등) (조건은 `lib/supabase/proxy.ts` 참고)
 - **인증 확인 라우트**: `/auth/confirm/route.ts`에서 이메일 확인 처리
 
@@ -109,6 +112,15 @@ NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=[Supabase Anon Key]
 ```
 
 **참고**: 환경 변수가 설정되지 않은 경우 Proxy는 인증 확인을 자동으로 건너뜁니다 (`lib/utils.ts`의 `hasEnvVars`).
+
+선택 환경 변수:
+
+```
+# Supabase Dashboard에서 활성화를 마친 소셜 provider만 쉼표로 (비우면 모든 소셜 버튼이 '준비 중' 안내)
+NEXT_PUBLIC_ENABLED_SOCIAL_PROVIDERS=google,kakao,custom:naver
+```
+
+`NEXT_PUBLIC_*` 값은 빌드 시 고정되므로 바꾼 뒤 개발 서버를 다시 시작한다. 조회·판정은 `lib/auth/providers.ts`의 `isSocialProviderEnabled()`.
 
 ### 경로 별칭 설정
 
@@ -161,7 +173,9 @@ import { Button } from "@/components/ui/button";
 
 ### TypeScript 타입
 
-- Supabase 데이터베이스 타입: `lib/supabase/database.types.ts` (생성 파일, 직접 수정 금지). 세 Supabase 클라이언트에 `Database` 제네릭 적용됨
+- Supabase 데이터베이스 타입: `lib/supabase/database.types.ts` (생성 파일, 직접 수정 금지). 세 Supabase 클라이언트에 `Database` 제네릭 적용됨. RPC(`respond_to_event`) 타입 포함
+- 앱 뷰 모델(`types/event.ts`)에는 아직 DB에 없는 컬럼(`hidden_*`, `role`, Task 009-1)과 파생 값(`cover_image_url`)이 있어 조회 계층이 매핑한다. `rsvps.status`는 생성 타입이 `string`이므로 `isRsvpStatus()`(`types/rsvp.ts`)로 좁힌다
+- 정원 판정·대기자 승격은 앱 코드가 아니라 DB(RPC·트리거)가 처리한다 (`docs/DB_SCHEMA.md` 7장)
 - 스키마 변경 후 Supabase MCP의 `generate_typescript_types`로 다시 생성하여 위 경로에 저장
 - **테이블 권한**: 이 프로젝트는 `public` 새 테이블에 `anon`·`authenticated` 기본 권한이 없다. 마이그레이션에서 RLS 정책과 함께 필요한 GRANT(가능하면 컬럼 단위)를 명시해야 한다 (`docs/DB_SCHEMA.md` 5장)
 

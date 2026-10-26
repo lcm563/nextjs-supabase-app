@@ -1,7 +1,7 @@
 # DB 스키마 설계안
 
 > 기준: [PRD.md](./PRD.md) 7장 데이터 모델 · 작성: Task 002 (설계만, 구현 제외)
-> 1~5장은 **Task 005에서 적용 완료**(2026-10-25, 마이그레이션 `create_core_tables`·`profiles_on_signup`·`core_rls`·`core_table_grants`). 7장 RPC는 Task 008, 9장은 각 Task에서 적용합니다.
+> 1~5장은 **Task 005에서 적용 완료**(2026-10-25, 마이그레이션 `create_core_tables`·`profiles_on_signup`·`core_rls`·`core_table_grants`). 7장 RPC·정원 트리거는 **Task 008-a에서 적용 완료**(2026-10-26, `rsvp_rpc`), 9-1 커버 이미지는 **Task 007-1a에서 적용 완료**(2026-10-26, `event_covers`·`event_covers_select_own`). 나머지 9장은 각 Task에서 적용합니다.
 > 적용 순서: Supabase MCP `apply_migration` → `get_advisors` → `generate_typescript_types`(`lib/supabase/database.types.ts`).
 
 ## 1. 결정 요약
@@ -141,14 +141,14 @@ create trigger on_auth_user_created
 
 이 프로젝트는 `public` 스키마에 새로 만든 테이블에 API 역할(`anon`·`authenticated`)의 기본 권한이 **부여되지 않는다**. RLS 정책만으로는 접근할 수 없어서 `core_table_grants`에서 필요한 권한만 명시적으로 줬다. 새 테이블·컬럼을 추가할 때도 GRANT를 함께 적어야 한다.
 
-| 테이블   | authenticated 권한                                                                                                              |
-| -------- | ------------------------------------------------------------------------------------------------------------------------------- |
-| profiles | SELECT, UPDATE(`display_name`, `avatar_url`)                                                                                    |
-| events   | SELECT, DELETE, INSERT(`host_id` + 입력 컬럼 7개), UPDATE(입력 컬럼 7개) — `id`·`host_id`·시각 컬럼은 클라이언트가 바꿀 수 없음 |
-| rsvps    | SELECT                                                                                                                          |
+| 테이블   | authenticated 권한                                                                                                                                                        |
+| -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| profiles | SELECT, UPDATE(`display_name`, `avatar_url`)                                                                                                                              |
+| events   | SELECT, DELETE, INSERT(`host_id` + 입력 컬럼 7개 + `cover_image_path`), UPDATE(입력 컬럼 7개 + `cover_image_path`) — `id`·`host_id`·시각 컬럼은 클라이언트가 바꿀 수 없음 |
+| rsvps    | SELECT                                                                                                                                                                    |
 
 - `anon`은 권한이 없다. `TRUNCATE`·`REFERENCES`·`TRIGGER`는 회수했다(TRUNCATE는 RLS를 우회한다).
-- Task 007-1의 `cover_image_path`, Task 009-1의 컬럼도 필요하면 컬럼 단위로 GRANT한다. 9-2·9-3의 "컬럼 권한 제한"은 이 방식으로 이미 기본 적용된 상태다.
+- Task 007-1의 `cover_image_path`는 `event_covers`에서 INSERT·UPDATE를 컬럼 단위로 GRANT했다. Task 009-1의 컬럼도 필요하면 컬럼 단위로 GRANT한다. 9-2·9-3의 "컬럼 권한 제한"은 이 방식으로 이미 기본 적용된 상태다.
 
 ### 검증 (Task 005)
 
@@ -195,7 +195,7 @@ grant execute on function public.respond_to_event(uuid, text) to authenticated;
    - `p_status = 'going'`이고 `capacity`가 있고 현재 `going` 수 ≥ `capacity`이면 → `waitlist` (이미 `waitlist`면 순서 유지를 위해 갱신하지 않음)
    - 그 외에는 `p_status`
 8. upsert: `insert ... on conflict (event_id, user_id) do update set status = excluded.status` (상태가 같으면 쓰지 않아 `updated_at` 유지)
-9. 승격: `v_prev = 'going'`이었고 새 상태가 `going`이 아니면, 같은 이벤트의 `waitlist` 중 `updated_at`이 가장 이른 1명을 `going`으로 변경 (`for update skip locked` 불필요 — 3단계 잠금으로 이미 직렬화됨)
+9. 승격: `v_prev = 'going'`이었고 새 상태가 `going`이 아니면 `promote_waitlist(p_event_id)` 호출 (`for update skip locked` 불필요 — 3단계 잠금으로 이미 직렬화됨)
 10. 본인의 최종 rsvps 행 반환
 
 ### 에러 전달 규약
@@ -212,10 +212,34 @@ grant execute on function public.respond_to_event(uuid, text) to authenticated;
 
 정원 초과는 에러가 아니라 `waitlist` 상태로 정상 반환됩니다(`CAPACITY` 코드는 이벤트 수정 시 정원 축소 검증 등에 예약).
 
-### 정원 변경 시 (Task 007/008에서 확정)
+### 대기자 승격: `promote_waitlist(p_event_id) returns integer`
 
-- **정원 확대 / 무제한 전환**: 늘어난 자리만큼 대기자를 순서대로 승격하는 `promote_waitlist(p_event_id)`를 이벤트 수정 Server Action에서 호출한다.
-- **정원 축소**: 이미 `going`인 사람을 대기로 내리지 않는다. 현재 참석 수보다 작게 줄이려 하면 `CAPACITY` 에러로 막는 방안을 권장한다.
+- 내부용 `security definer` 함수. `public`·`anon`·`authenticated`의 실행 권한을 모두 회수했다(RPC로 직접 호출 불가).
+- 정원이 null이면 대기자 전원을, 아니면 남은 자리(`capacity - going 수`)만큼 `updated_at, id` 오름차순으로 `going`으로 바꾸고 승격 수를 반환한다.
+- 호출자가 이벤트 행을 잠근 상태여야 한다(`respond_to_event`의 `for update`, 아래 정원 트리거의 events UPDATE).
+
+### 정원 변경 시 (Task 008-a에서 트리거로 확정)
+
+앱 코드가 정원을 읽고 판정하지 않도록 events 트리거로 처리한다. 둘 다 `when (old.capacity is distinct from new.capacity)`일 때만 실행된다.
+
+| 트리거                    | 시점                        | 동작                                                                                          |
+| ------------------------- | --------------------------- | --------------------------------------------------------------------------------------------- |
+| `events_capacity_guard`   | `before update of capacity` | 정원을 줄이거나 무제한→유한으로 바꿀 때 현재 `going` 수가 새 정원보다 많으면 `CAPACITY` 예외  |
+| `events_capacity_promote` | `after update of capacity`  | 정원이 늘었거나 null(무제한)이 되면 `promote_waitlist` 호출 (`security definer`, 트리거 전용) |
+
+- 이미 `going`인 사람은 대기로 내리지 않는다. 이벤트 수정 Server Action(`updateEvent`)은 `CAPACITY`를 정원 필드 오류로 보여준다.
+
+### 검증 (Task 008-a)
+
+`execute_sql` 한 번의 DO 블록에서 임시 사용자 5명(주최자 + A~D)으로 실행하고 예외로 전부 롤백했다. 한 트랜잭션 안에서는 `now()`가 고정되어 `updated_at`이 모두 같아지므로, 응답 뒤 postgres 권한으로 `rsvps_set_updated_at` 트리거를 잠시 끄고 `updated_at`을 사용자마다 다르게 과거로 옮겨 실제 요청 순서를 흉내 냈다.
+
+- 정원 2: A·B `going`, C·D `going` 요청 → `waitlist`. 같은 상태 재요청(B going, C going) 시 `updated_at` 불변
+- A `not_going` → 먼저 대기한 C만 승격, D는 대기 유지
+- 정원 2→1 축소 → `CAPACITY`(정원 유지), 무제한 전환 → D 승격
+- 정원 1→2 확대 → 먼저 대기한 B만 승격. 참석자가 `maybe`로 바꾸면 다음 대기자 승격
+- `UNAUTHENTICATED`·`VALIDATION`(waitlist 직접 요청)·`NOT_FOUND`·`DEADLINE_PASSED`·`EVENT_ENDED`, rsvps 직접 INSERT 거부
+- 실행 권한: `anon`은 `respond_to_event` 불가, `authenticated`는 `promote_waitlist` 불가
+- `get_advisors` security: `respond_to_event`가 `authenticated_security_definer_function_executable` 경고로 표시된다. 다른 사용자를 승격하려면 definer 권한이 필요하고 로그인 사용자가 호출해야 하므로 **의도된 예외**다(함수 안에서 `auth.uid()`로 본인만 응답).
 
 ## 8. 앱 코드와의 대응
 
@@ -228,7 +252,7 @@ grant execute on function public.respond_to_event(uuid, text) to authenticated;
 | `respond_to_event` 인자 | `rsvpInputSchema` (`lib/validations/rsvp.ts`)                        |
 | 상태별 인원 집계        | `EventWithCounts.rsvp_counts` — Task 005에서 뷰/RPC 형태 확정        |
 
-`database.types.ts`는 Task 005에서 생성했고, 세 Supabase 클라이언트(`server`·`client`·`proxy`)에 `Database` 제네릭을 적용했다. 다만 앱 타입(`types/event.ts`)에는 아직 DB에 없는 컬럼(`cover_image_path`, `hidden_*`, `role`)이 있어서 조회 계층(`lib/queries/`, Task 007)이 매핑한다. `Tables<"events">` 파생으로 바꾸는 것은 해당 컬럼이 모두 생기는 Task 009-1 이후로 미룬다.
+`database.types.ts`는 Task 005에서 생성하고 스키마 변경마다 다시 생성했으며(최근: Task 008-a·007-1a), 세 Supabase 클라이언트(`server`·`client`·`proxy`)에 `Database` 제네릭을 적용했다. 다만 앱 타입(`types/event.ts`)에는 아직 DB에 없는 컬럼(`hidden_*`, `role`)과 파생 값(`cover_image_url`)이 있어서 조회 계층(`lib/queries/`, Task 007)이 매핑한다. `Tables<"events">` 파생으로 바꾸는 것은 해당 컬럼이 모두 생기는 Task 009-1 이후로 미룬다.
 
 ## 9. 추가 기능 설계안
 
@@ -251,9 +275,15 @@ values ('event-covers', 'event-covers', true, 5242880,
 
 | storage.objects 정책 | 조건 (`bucket_id = 'event-covers'` 공통)                                     |
 | -------------------- | ---------------------------------------------------------------------------- |
-| SELECT               | 공개 버킷이라 정책 불필요 (목록 조회 방지를 위해 SELECT 정책은 없음)         |
+| SELECT               | `authenticated`, 본인 폴더만 (아래 참고)                                     |
 | INSERT               | `authenticated`, `(storage.foldername(name))[1] = (select auth.uid())::text` |
 | UPDATE / DELETE      | INSERT와 같은 조건 (본인 폴더만)                                             |
+
+**적용 결과 (Task 007-1a, 2026-10-26)**
+
+- 정책 이름: `event_covers_insert_own`·`event_covers_update_own`·`event_covers_delete_own`·`event_covers_select_own`. `events.cover_image_path`는 INSERT·UPDATE를 컬럼 단위로 GRANT했다.
+- **SELECT 정책을 본인 폴더로 추가(설계 변경)**: 처음 설계는 SELECT 정책을 두지 않았지만, RLS에서 DELETE는 SELECT 정책으로 보이는 행에만 적용된다. 그래서 정책이 없으면 Storage API `remove()`가 본인 객체도 0건 삭제한다(SQL로 확인). 본인 폴더만 보이게 해서 교체·삭제 정리를 가능하게 하고, 다른 사용자 폴더 목록 조회는 계속 막는다. 공개 URL 읽기는 정책과 무관하다.
+- 검증(DO 블록, 롤백): 다른 사용자 폴더 INSERT 거부, 본인 폴더 INSERT 허용, 다른 버킷 INSERT 거부, 다른 사용자 객체는 보이지 않고 UPDATE·DELETE 0건, 본인 객체 DELETE 1건. SQL 직접 DELETE는 `storage.protect_delete` 트리거가 막으므로 검증 블록 안에서만 `storage.allow_delete_query`를 켰다. 앱은 반드시 Storage API로 지운다.
 
 ### 9-2. 관리자 역할
 
@@ -347,3 +377,15 @@ values (
 - 카카오는 이메일 동의가 선택이라 `email`이 없을 수 있다 → 마지막 fallback `'사용자'`.
 - `left(..., 50)`으로 `display_name` 길이 제약(1~50자)을 지킨다.
 - 대응 앱 코드: provider 상수 `lib/auth/providers.ts`, 콜백 `app/auth/callback/route.ts`.
+
+**실제 연동 결과 (Task 006-1a, 2026-10-26 — Google·Kakao 적용, Naver 미연동)**
+
+- 앱은 `NEXT_PUBLIC_ENABLED_SOCIAL_PROVIDERS`에 적힌 provider만 `signInWithOAuth`로 보내고, 나머지 버튼은 '준비 중' 안내를 유지한다.
+- **자동 identity linking 확인**: 소셜 계정의 이메일이 기존 이메일 계정과 같으면 Supabase가 새 사용자를 만들지 않고 기존 `auth.users`에 identity를 추가한다. Google(`lcm563@naver.com`)과 Kakao(`lcm563@kakao.com`) 모두 기존 계정에 연결됐다(identities: `email` + `google`/`kakao`).
+  - 연결 시에는 `auth.users` INSERT가 없으므로 `handle_new_user`가 실행되지 않는다. 기존 `profiles`의 표시 이름이 유지되고 아바타는 채워지지 않는다.
+  - Google 연결 후 `raw_user_meta_data`는 Google 값으로 바뀌었다(앱은 `profiles`만 읽으므로 영향 없음).
+- **신규 소셜 가입 매핑**(실제 identity 메타데이터로 만든 임시 사용자, 롤백 검증): Google은 `full_name` → 표시 이름, `avatar_url` → 아바타. Kakao는 `full_name`/`name`(닉네임) → 표시 이름. Kakao 메타데이터에는 이미지 키가 없어 아바타가 비었다(프로필 사진 없음 또는 선택 동의 미체크).
+- **Kakao 동의항목**: Supabase는 scope `account_email profile_image profile_nickname`을 항상 요청한다. 동의항목이 설정되지 않으면 KOE205가 나므로 닉네임·프로필 사진을 설정하고, `account_email`을 위해 **개인 개발자 비즈 앱으로 전환**했다.
+- Redirect URLs에는 쿼리(`?next=`)까지 허용하도록 `http://localhost:3000/auth/callback**`를 등록한다.
+- 비로그인 이벤트 링크 → 로그인 → Google·Kakao 로그인 → 원래 이벤트 복귀를 사용자가 직접 확인했다.
+- **Naver 미연동**: Naver 개발자 앱과 Supabase Custom OAuth2 provider(`custom:naver`)를 아직 등록하지 않았다. 버튼은 '준비 중' 안내를 유지한다. 연동 시 userinfo가 `{ response: { ... } }` 중첩 구조라 클레임 매핑이 되는지 실제 로그인으로 먼저 확인해야 한다(안 되면 Route Handler 기반 자체 OAuth 흐름 검토).
