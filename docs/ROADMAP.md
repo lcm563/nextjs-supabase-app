@@ -11,10 +11,10 @@
 - **링크 → 로그인 → 원래 이벤트 복귀**: 공유 링크로 진입해도 끊김 없는 참여 흐름
 
 > 기준 문서: [PRD.md](./PRD.md) · 기술 스택: Next.js 16 (App Router) + Supabase (Auth, Postgres, RLS) + shadcn/ui + Tailwind CSS v3
-> 카풀(2차)·정산(3차)은 MVP 범위 밖이며 [MVP 이후 로드맵](#mvp-이후-로드맵)에 정리합니다.
+> 카풀(2차)·정산(3차)·네이버 로그인(4차)은 MVP 범위 밖이며 [MVP 이후 로드맵](#mvp-이후-로드맵)에 정리합니다.
 
-**📅 최종 업데이트**: 2026-10-25
-**📊 진행 상황**: Phase 1·2 완료(추가 기능 골격·UI 포함), Phase 3 대기 중 (8/18 Tasks 완료, 44%)
+**📅 최종 업데이트**: 2026-10-26
+**📊 진행 상황**: Phase 1·2·3 완료(소셜 로그인은 Google·Kakao), Phase 4 대기 중 (15/18 Tasks 완료, 83%)
 
 ## 개발 워크플로우
 
@@ -102,76 +102,75 @@
   - ✅ 키보드 흐름: 소셜 버튼, 커버 선택→미리보기→제거, 역할 전환 → 숨김·복구 → 역할 변경 → 신고 처리, 일반 사용자 `/admin`·숨김 이벤트 404
   - ✅ 점검 중 수정: 지난 이벤트 카드는 커버만 흐리게(글자 대비 유지), 숨김 배너 글자색, 단독 텍스트 링크 높이 24px 이상(WCAG 2.5.8)
 
-### Phase 3: 핵심 기능 구현
+### Phase 3: 핵심 기능 구현 ✅
 
-- **Task 005: 데이터베이스 구축 및 RLS 적용** - 우선순위
-  - Supabase MCP `apply_migration`으로 `profiles`, `events`, `rsvps` 테이블·제약(`unique(event_id, user_id)`) 생성
-  - `auth.users` 가입 트리거로 `profiles` 자동 생성
-  - PRD 7장 RLS 정책 적용 (본인만 RSVP 쓰기, 주최자만 이벤트 수정/삭제)
-  - `get_advisors`로 보안·성능 점검, 지적 사항 해소
-  - `generate_typescript_types`로 `lib/supabase/database.types.ts` 생성
-  - Playwright MCP·SQL로 RLS 동작 검증 (타인 데이터 쓰기 차단 확인)
+- **Task 005: 데이터베이스 구축 및 RLS 적용** ✅ - 완료
+  - ✅ `apply_migration`으로 `profiles`·`events`·`rsvps` 테이블·제약(`unique(event_id, user_id)`)·인덱스 생성 (`create_core_tables`)
+  - ✅ `auth.users` 가입 트리거 `handle_new_user`로 `profiles` 자동 생성 (소셜 fallback 버전)
+  - ✅ RLS 정책과 컬럼 단위 GRANT (`core_rls`·`core_table_grants`) — rsvps 쓰기는 RPC로만
+  - ✅ `get_advisors` 점검, `lib/supabase/database.types.ts` 생성 후 세 Supabase 클라이언트에 `Database` 제네릭 적용
+  - ✅ SQL 롤백 시나리오로 RLS 검증 (타인 데이터 쓰기 차단)
 
-- **Task 006: 인증 흐름 보강 및 링크 복귀 구현**
-  - `lib/supabase/proxy.ts`: 미인증 리다이렉트 시 원래 경로를 `next` 파라미터로 보존 (`createServerClient`~`getClaims()` 사이에 코드 추가 금지, 새 Response 생성 시 쿠키 복사)
-  - 로그인·가입·이메일 확인(`/auth/confirm`) 성공 후 `next` 경로로 이동, 내부 경로만 허용(오픈 리다이렉트 방지) — 검증은 `lib/safe-next.ts`의 `sanitizeNext()` 사용 (`/auth/confirm`은 적용 완료)
-  - 미인증 리다이렉트 응답에 세션 쿠키 복사, 로그인 페이지는 서버에서 `searchParams.next`를 읽어 폼에 전달
-  - 환경 변수 누락 시 프로덕션에서는 인증 검사를 건너뛰지 않도록 변경 (현재 `hasEnvVars` false면 fail-open)
-  - 가입 시 표시 이름(`display_name`) 입력 및 프로필 연동
-  - Playwright MCP로 인증 플로우 E2E 테스트 (비로그인 링크 접근 → 로그인 → 원래 이벤트 복귀)
+- **Task 006: 인증 흐름 보강 및 링크 복귀 구현** ✅ - 완료
+  - ✅ `lib/supabase/proxy.ts`: 미인증 리다이렉트 시 원래 경로를 `next`로 보존, 세션 쿠키 복사, 프로덕션 환경 변수 누락 시 fail-closed
+  - ✅ 로그인·가입·이메일 확인(`/auth/confirm`) 후 `sanitizeNext()`로 검증한 `next`로 이동, 인증 화면 사이 링크는 `withNext()`로 유지
+  - ✅ 가입 시 표시 이름(`display_name`) 입력 및 프로필 연동
+  - ✅ 비로그인 링크 접근 → 로그인 → 원래 이벤트 복귀 E2E 확인
 
-- **Task 006-1: 소셜 로그인 (Google · Kakao · Naver)**
-  - UI·목업은 Task 004-1, 콜백 라우트 골격은 Task 002-1에서 완료 — 이 Task는 실제 provider 연동
-  - 사전 준비(사용자 작업): 각 개발자 콘솔에서 앱 생성, Redirect URI에 `https://<project-ref>.supabase.co/auth/v1/callback` 등록, Supabase Dashboard에 Client ID/Secret 입력, Auth URL Configuration의 Redirect URLs에 `http://localhost:3000/auth/callback`·배포 도메인 추가 (키·시크릿은 커밋 금지)
-  - Google·Kakao: Supabase 기본 provider 활성화 (Kakao 이메일은 비즈 앱 심사 전에는 제공되지 않을 수 있으므로 `email`이 없는 계정을 전제)
-  - Naver: 기본 provider가 아니므로 Custom OAuth2 provider `custom:naver`로 등록 (authorize `https://nid.naver.com/oauth2.0/authorize`, token `https://nid.naver.com/oauth2.0/token`, userinfo `https://openapi.naver.com/v1/nid/me`)
-    - ⚠️ Naver userinfo는 `{ response: { id, email, ... } }` 중첩 구조라 클레임 매핑이 안 될 위험 → 첫 단계에서 실제 로그인으로 검증, 실패 시 Route Handler 기반 자체 OAuth 흐름 검토
-  - `app/auth/callback/route.ts`(Task 002-1 골격)로 실제 로그인 흐름 검증
-  - 소셜 버튼 목업 동작을 `signInWithOAuth({ provider, options: { redirectTo } })` 호출로 교체, Task 006의 `next` 보존과 연동
-  - `handle_new_user` 트리거 보강: 표시 이름을 `display_name` → `full_name`/`name`/`nickname` → 이메일 앞부분 → 기본값 순으로 채우고, `avatar_url`도 메타데이터에서 채움 (이메일 없는 계정 대응)
-  - 같은 이메일의 이메일/소셜 계정 연결 동작(Supabase 자동 identity linking) 확인 및 문서화
-  - PRD·DB_SCHEMA.md 반영
+- **Task 006-1: 소셜 로그인 (Google · Kakao)** ✅ - 완료 (Naver는 [MVP 이후 로드맵](#mvp-이후-로드맵) 4차로 보류)
+  - ✅ `SocialLoginButtons`: `NEXT_PUBLIC_ENABLED_SOCIAL_PROVIDERS`에 켜진 provider만 `signInWithOAuth({ provider, options: { redirectTo: /auth/callback?next=... } })`로 이동
+  - ✅ Google·Kakao Supabase provider 활성화(사용자 작업). Kakao는 Supabase가 `account_email`을 항상 요청해 KOE205 → 동의항목 설정과 개인 개발자 비즈 앱 전환으로 해결
+  - ✅ 같은 이메일의 기존 계정에 자동 identity linking 확인(새 사용자 없음, 기존 표시 이름 유지) — [DB_SCHEMA.md](./DB_SCHEMA.md) 9-6, PRD 가정에 기록
+  - ✅ 네이버 버튼은 로그인·가입 화면에서 숨김 (`HIDDEN_SOCIAL_PROVIDERS`)
   - 테스트 체크리스트 (Playwright MCP)
-    - [ ] provider별 로그인 → `profiles` 행 생성(표시 이름·아바타) 확인
-    - [ ] 비로그인으로 공유 링크 진입 → 소셜 로그인 → 원래 이벤트로 복귀
-    - [ ] 로그인 취소·동의 거부 시 `/auth/error` 안내
-    - [ ] `next`에 외부 URL(`//evil.com` 등) 주입 시 기본 경로로 대체
+    - [x] provider별 로그인 → `profiles` 행 확인 (연결 시 기존 프로필 유지, 신규 가입 매핑은 실제 메타데이터로 롤백 검증: Google 이름·아바타, Kakao 이름)
+    - [x] 비로그인으로 공유 링크 진입 → 소셜 로그인 → 원래 이벤트로 복귀 (Google·Kakao 사용자 확인)
+    - [x] 로그인 취소·동의 거부 시 `/auth/error` 안내
+    - [x] `next`에 외부 URL(`//evil.com` 등) 주입 시 기본 경로로 대체
 
-- **Task 007: 이벤트 CRUD 구현**
-  - Server Action으로 이벤트 생성·수정·삭제 (`lib/supabase/server.ts`의 `createClient()`를 함수 내에서 매번 생성)
-  - 서버 측 주최자 권한 재검증 및 zod 입력 검증
-  - 이벤트 상세·목록 페이지를 더미 데이터에서 실제 쿼리로 교체
-  - 공유 링크(`/events/[id]`) 복사 및 존재하지 않는 ID 처리
-  - Playwright MCP로 생성→조회→수정→삭제 E2E 테스트
+- **Task 007: 이벤트 CRUD 구현** ✅ - 완료
+  - ✅ 조회 계층 `lib/queries/events.ts` (`getMyEvents`·`getEventDetail`, 상태별 응답 집계·내 응답·커버 공개 URL)
+  - ✅ Server Action `app/events/actions.ts` (`createEvent`·`updateEvent`·`deleteEvent`): zod 서버 재검증, 세션 기준 `host_id`, 주최자 재검증(NOT_FOUND·FORBIDDEN), `revalidatePath`
+  - ✅ 오류 코드 → 한국어 안내 공용화 (`ACTION_ERROR_MESSAGES`·`failWith`), 필드 오류는 폼 칸에 표시
+  - ✅ 이벤트 목록·상세·수정·복제 페이지 실데이터 교체, 잘못된·없는 ID는 404
+  - ✅ 생성→조회→수정→복제→삭제 E2E
 
-- **Task 007-1: 이벤트 커버 이미지 (Supabase Storage)**
-  - UI·목업은 Task 004-1에서 완료 — 이 Task는 Storage 연동과 더미 커버(`public/mock/covers/`) 삭제
-  - 마이그레이션: `events.cover_image_path text` 컬럼, 공개 버킷 `event-covers` (파일 5MB 제한, `image/jpeg`·`image/png`·`image/webp`만 허용)
-  - `storage.objects` 정책: 업로드·교체·삭제는 경로 첫 폴더가 `(select auth.uid())`일 때만 (`{user_id}/{uuid}.{ext}`), 조회는 공개 버킷 기본 동작 (경로를 추측할 수 없도록 UUID 파일명)
-  - 업로드: 브라우저 클라이언트(`lib/supabase/client.ts`)로 Storage에 직접 업로드(Server Action 본문 1MB 제한 회피) → 경로만 이벤트 생성·수정 Server Action으로 전달, 서버에서 경로 소유자 재검증
-  - 이미지 교체·제거·이벤트 삭제 시 이전 파일 정리, 복제(`?copy=`) 시 이미지는 복사하지 않음
-  - 커버 이미지 필드의 목업 업로드를 실제 Storage 업로드로 교체, 조회 계층에서 `cover_image_path` → 공개 URL 변환
-  - `next.config.ts`의 `images.remotePatterns`에 Supabase Storage 호스트 추가
-  - `get_advisors`(security) 점검, `database.types.ts` 재생성, PRD·DB_SCHEMA.md 반영
+- **Task 007-1: 이벤트 커버 이미지 (Supabase Storage)** ✅ - 완료
+  - ✅ 마이그레이션: `events.cover_image_path`(컬럼 GRANT 포함), 공개 버킷 `event-covers`(5MB, jpeg·png·webp), 본인 폴더 INSERT·UPDATE·DELETE 정책
+  - ✅ 본인 폴더 SELECT 정책 추가(설계 변경) — SELECT 정책이 없으면 Storage `remove()`가 0건 삭제됨을 SQL로 확인
+  - ✅ 브라우저에서 `{uid}/{uuid}.{ext}`로 직접 업로드 → 경로만 Server Action에 전달, 서버에서 경로 소유자 재검증, 저장 실패 시 업로드 객체 삭제
+  - ✅ 교체·제거·이벤트 삭제 시 이전 파일 정리, 복제 시 미복사, `next.config.ts` `remotePatterns`, 더미 커버 삭제
   - 테스트 체크리스트 (Playwright MCP)
-    - [ ] 업로드 → 목록 썸네일·상세 커버 표시
-    - [ ] 5MB 초과·허용 외 형식 거부 안내
-    - [ ] 타인 폴더 경로로 업로드·삭제 시도 차단 (RLS)
-    - [ ] 이미지 교체·제거·이벤트 삭제 시 이전 파일 삭제 확인
-    - [ ] 360px·다크 모드 레이아웃
+    - [x] 업로드 → 목록 썸네일·상세 커버 표시
+    - [x] 5MB 초과·허용 외 형식 거부 안내
+    - [x] 타인 폴더 경로로 업로드·삭제 시도 차단 (RLS SQL 검증 + 서버 경로 검증 FORBIDDEN)
+    - [x] 이미지 교체·제거·이벤트 삭제 시 이전 파일 삭제 확인
+    - [x] 360px·다크 모드 레이아웃
 
-- **Task 008: 참석 응답·정원·대기자 로직 구현**
-  - 응답(참석/불참/미정) upsert Server Action, 사용자당 이벤트별 1건 보장
-  - 정원 판정·대기자 전환·자동 승격을 DB 함수(RPC) 트랜잭션으로 구현 (동시성 대응)
-  - 참여자 현황(상태별 목록, 이름 표시) 실제 데이터 연동
-  - 응답 변경 후 화면 갱신 (`revalidatePath` 또는 캐시 태그 무효화)
-  - Playwright MCP로 정원 초과 → 대기자 전환 → 취소 시 승격 시나리오 테스트
+- **Task 008: 참석 응답·정원·대기자 로직 구현** ✅ - 완료
+  - ✅ RPC `respond_to_event`(이벤트 행 잠금, 정원 판정·대기 전환·승격 한 트랜잭션), 내부용 `promote_waitlist`
+  - ✅ 정원 트리거: 현재 참석 수보다 작게 축소 시 `CAPACITY` 거부(폼 정원 칸에 표시), 확대·무제한 전환 시 대기자 승격
+  - ✅ `respondToEvent` Server Action과 `RsvpButtons` 연동(대기 여부는 서버 결과 사용), 참여자 현황·정원 배지 갱신
+  - ✅ 정원 초과 → 대기 → 취소 시 승격을 SQL 롤백 시나리오와 실제 두 계정으로 확인
 
-- **Task 008-1: 핵심 기능 통합 테스트**
-  - Playwright MCP로 전체 사용자 플로우 테스트 (주최자 생성·공유 → 참여자 가입·응답 → 현황 확인)
-  - 정원 동시 응답 경쟁 상태, 권한 없는 수정·삭제 시도 등 엣지 케이스 검증
-  - 에러 핸들링(잘못된 입력, 만료 세션, 삭제된 이벤트) 검증
-  - 360px 모바일 뷰포트 기준 P0 기능(F-01~F-09) 수용 기준 점검
+- **Task 008-1: 핵심 기능 통합 테스트** ✅ - 완료
+  - ✅ 실사용자 플로우(360px): 커버 포함 생성 → 공유 링크 복사 → 참석(정원 마감) → 다른 사용자 대기 → 불참 시 자동 승격 → 정원 확대 → 축소 거부 → 복제 → 삭제 → 삭제된 링크 404
+  - ✅ 점검 스크립트: 16개 화면 × 360·1280px × 라이트·다크(64조합) 가로 스크롤·대비·터치 영역·콘솔 오류 0건
+  - ✅ 엣지 케이스: 만료 세션(쿠키 없는 페이지·Server Action 요청 → 로그인 리다이렉트), 잘못된 입력 서버 거부, 비주최자 수정·삭제 0건·`host_id` 변경 거부·rsvps 직접 쓰기 거부, 마지막 한 자리 경쟁 시 한 명만 참석(SQL 롤백)
+  - ✅ 이벤트 화면에서 쓰지 않는 mock 제거 (`lib/mock`은 관리자 화면 전용으로 축소)
+  - P0 수용 기준 점검 (PRD 5장)
+
+    | 기능                          | 결과 | 확인 내용                                                                |
+    | ----------------------------- | ---- | ------------------------------------------------------------------------ |
+    | F-01 회원가입/로그인          | ✅   | 이메일 가입·로그인·로그아웃, 소셜(Google·Kakao), 가입 시 `profiles` 생성 |
+    | F-02 이벤트 생성              | ✅   | 필수·선택 필드, 주최자 자동 지정, 클라이언트·서버 필드별 오류            |
+    | F-03 이벤트 상세              | ✅   | 공지·일시·장소·주최자·정원 대비 참석 수                                  |
+    | F-04 공유 링크                | ✅   | `/events/[id]` 클립보드 복사, "링크를 복사했습니다" 토스트               |
+    | F-05 로그인 후 원래 링크 복귀 | ✅   | 이메일·소셜 로그인 모두 원래 이벤트로 복귀, 외부 `next` 차단             |
+    | F-06 참석 응답                | ✅   | 참석·불참·미정 변경, 사용자당 1건(unique 제약 + RPC upsert)              |
+    | F-07 정원·대기자              | ✅   | 정원 초과 시 대기, 불참 시 먼저 대기한 사람 자동 승격                    |
+    | F-08 참여자 현황              | ✅   | 참석·대기·미정·불참 목록과 이름, 로그인 사용자 모두 열람                 |
+    | F-09 이벤트 수정/삭제         | ✅   | 주최자만(UI·Server Action·RLS), 삭제 확인 대화상자                       |
 
 ### Phase 4: 고급 기능 및 최적화
 
@@ -216,12 +215,12 @@
 
 ## MVP 이후 로드맵
 
-| 단계 | 내용                                                          |
-| ---- | ------------------------------------------------------------- |
-| 2차  | **카풀 매칭** — 운전자 좌석 등록, 탑승 신청, 출발지·시간 조율 |
-| 3차  | **정산** — 비용 입력, N분의 1 계산, 입금 확인 체크            |
-| 4차  | 자동 반복 일정, 이메일/푸시 알림                              |
-| 5차  | 모임(Group) 단위·멤버 관리, 출석 통계                         |
+| 단계 | 내용                                                                                                                                                                                                |
+| ---- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 2차  | **카풀 매칭** — 운전자 좌석 등록, 탑승 신청, 출발지·시간 조율                                                                                                                                       |
+| 3차  | **정산** — 비용 입력, N분의 1 계산, 입금 확인 체크                                                                                                                                                  |
+| 4차  | 자동 반복 일정, 이메일/푸시 알림, **네이버 소셜 로그인** — Naver 개발자 앱·Supabase Custom OAuth2(`custom:naver`) 등록, 중첩 userinfo 매핑 검증 후 로그인 화면 버튼 다시 표시 (Task 006-1에서 보류) |
+| 5차  | 모임(Group) 단위·멤버 관리, 출석 통계                                                                                                                                                               |
 
 ## PRD 요구사항 매핑
 
@@ -233,6 +232,6 @@
 | F-06, F-07, F-08 응답·정원·현황 | Task 004, 008            |
 | F-10~F-14 (P1)                  | Task 009                 |
 | 보안(RLS)·성능·접근성           | Task 005, 010            |
-| 추가: 소셜 로그인               | Task 002-1, 004-1, 006-1 |
+| 추가: 소셜 로그인 (Naver는 4차) | Task 002-1, 004-1, 006-1 |
 | 추가: 이벤트 커버 이미지        | Task 002-1, 004-1, 007-1 |
 | 추가: 관리자 화면               | Task 002-1, 004-2, 009-1 |

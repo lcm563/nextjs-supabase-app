@@ -1,6 +1,11 @@
 "use client";
 
-import { SOCIAL_PROVIDERS, type SocialProvider } from "@/lib/auth/providers";
+import {
+  LOGIN_SOCIAL_PROVIDERS,
+  isSocialProviderEnabled,
+  type SocialProvider,
+} from "@/lib/auth/providers";
+import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
@@ -11,7 +16,7 @@ type SocialLoginButtonsProps = {
   className?: string;
 };
 
-// 모의 이동 지연 (Task 006-1에서 제거)
+// 아직 켜지 않은 provider의 '준비 중' 안내 지연
 const MOCK_DELAY_MS = 600;
 
 // 브랜드 색은 각 사 로그인 버튼 가이드를 따르므로 디자인 토큰 예외로 둔다.
@@ -25,7 +30,7 @@ const PROVIDER_STYLES: Record<SocialProvider, string> = {
     "border border-[#DADCE0] bg-white text-[#1F1F1F] hover:bg-[#F2F2F2]",
 };
 
-// 소셜 로그인 버튼 목록 (현재는 목업: 클릭하면 준비 중 안내)
+// 소셜 로그인 버튼 목록. 켜진 provider는 OAuth(PKCE)로 이동하고, 나머지는 준비 중 안내
 export function SocialLoginButtons({
   next,
   className,
@@ -40,11 +45,27 @@ export function SocialLoginButtons({
     []
   );
 
-  const signIn = (id: SocialProvider, label: string) => {
+  const signIn = async (id: SocialProvider, label: string) => {
     if (pendingId) return;
     setPendingId(id);
-    // TODO(Task 006-1): supabase.auth.signInWithOAuth({ provider: id, options: { redirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(next ?? "/events")}` } })
-    void next;
+
+    if (isSocialProviderEnabled(id)) {
+      // 성공하면 provider 화면으로 이동하므로 pending을 풀지 않는다. 돌아오면 /auth/callback이 next를 다시 검증한다
+      const { error } = await createClient().auth.signInWithOAuth({
+        provider: id,
+        options: {
+          redirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(next ?? "/events")}`,
+        },
+      });
+      if (error) {
+        toast.error(
+          `${label} 로그인을 시작하지 못했습니다. 잠시 후 다시 시도해주세요`
+        );
+        setPendingId(null);
+      }
+      return;
+    }
+
     timerRef.current = setTimeout(() => {
       toast.info(`${label} 로그인은 준비 중입니다`);
       setPendingId(null);
@@ -58,13 +79,13 @@ export function SocialLoginButtons({
       aria-busy={pendingId !== null}
       className={cn("flex flex-col gap-2", className)}
     >
-      {SOCIAL_PROVIDERS.map(({ id, label }) => {
+      {LOGIN_SOCIAL_PROVIDERS.map(({ id, label }) => {
         const isPending = pendingId === id;
         return (
           <button
             key={id}
             type="button"
-            onClick={() => signIn(id, label)}
+            onClick={() => void signIn(id, label)}
             // disabled 대신 aria-disabled: 누른 버튼에서 키보드 포커스가 사라지지 않도록 (재클릭은 signIn에서 차단)
             aria-disabled={pendingId !== null}
             className={cn(
