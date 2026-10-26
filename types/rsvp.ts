@@ -10,6 +10,11 @@ export const RSVP_STATUSES = [
 
 export type RsvpStatus = (typeof RSVP_STATUSES)[number];
 
+// DB 생성 타입의 rsvps.status(string)를 RsvpStatus로 좁힌다
+export function isRsvpStatus(value: string): value is RsvpStatus {
+  return (RSVP_STATUSES as readonly string[]).includes(value);
+}
+
 // 사용자가 직접 선택하는 응답. waitlist는 정원 초과 시 서버(DB)가 지정한다.
 export type RsvpChoice = Exclude<RsvpStatus, "waitlist">;
 

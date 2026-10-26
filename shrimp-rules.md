@@ -9,27 +9,28 @@
 
 ## Directory Map
 
-| Path                                    | Role                                                                   |
-| --------------------------------------- | ---------------------------------------------------------------------- |
-| `app/`                                  | Routes (App Router). Existing: `/`, `/auth/*`, `/events/**`            |
-| `app/events/**`                         | Planned: `/events`, `/events/new`, `/events/[id]`, `/events/[id]/edit` |
-| `app/admin/**`                          | Admin screens (dashboard, events, users, reports). Admin role only     |
-| `components/ui/`                        | shadcn/ui primitives ONLY                                              |
-| `components/`                           | Domain/shared components (kebab-case filenames)                        |
-| `components/tutorial/`                  | Starter leftovers. Remove during Task 001; DO NOT extend               |
-| `lib/supabase/{server,client,proxy}.ts` | Three Supabase clients (see Supabase Rules)                            |
-| `lib/utils.ts`                          | `cn()`, `hasEnvVars`                                                   |
-| `lib/supabase/database.types.ts`        | Generated types (Task 005). DO NOT edit by hand                        |
-| `types/`                                | Domain types (`event`, `rsvp`, `admin`) and `ActionResult` (`action`)  |
-| `lib/validations/`                      | zod schemas, KST ↔ UTC (`kstLocalToIso`, `isoToKstLocal`)              |
-| `lib/format.ts`, `lib/event-status.ts`  | KST display formatting; `getEventPhase(event, now)`, RSVP labels       |
-| `lib/safe-next.ts`                      | `sanitizeNext()` — the ONLY way to validate `next` redirect values     |
-| `lib/auth/`                             | Auth constants (`SOCIAL_PROVIDERS`, `AUTH_PROVIDER_LABELS`)            |
-| `lib/mock/`                             | Dummy data for Phase 2 UI only (delete when replaced in Task 007/008)  |
-| `lib/mock/role.ts`                      | Dev-only role switch cookie (delete in Task 009-1)                     |
-| `proxy.ts` (root)                       | Calls `updateSession()`. Next.js 16: NEVER create `middleware.ts`      |
-| `docs/guides/`                          | Read the matching guide before the related work                        |
-| `shrimp_data/`                          | Task manager data. DO NOT edit manually                                |
+| Path                                    | Role                                                                                                             |
+| --------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| `app/`                                  | Routes (App Router). Existing: `/`, `/auth/*`, `/events/**`                                                      |
+| `app/events/**`                         | `/events`, `/events/new`, `/events/[id]`, `/events/[id]/edit`; Server Actions in `actions.ts`                    |
+| `app/admin/**`                          | Admin screens (dashboard, events, users, reports). Admin role only                                               |
+| `components/ui/`                        | shadcn/ui primitives ONLY                                                                                        |
+| `components/`                           | Domain/shared components (kebab-case filenames)                                                                  |
+| `lib/supabase/{server,client,proxy}.ts` | Three Supabase clients (see Supabase Rules)                                                                      |
+| `lib/utils.ts`                          | `cn()`, `hasEnvVars`                                                                                             |
+| `lib/supabase/database.types.ts`        | Generated types (regenerate after every schema change). DO NOT edit by hand                                      |
+| `lib/queries/`                          | Server-only read layer (`events.ts`): maps DB rows to view models                                                |
+| `lib/storage/event-covers.ts`           | Cover image Storage path / owner check / public URL helpers                                                      |
+| `types/`                                | Domain types (`event`, `rsvp`, `admin`) and `ActionResult` (`action`)                                            |
+| `lib/validations/`                      | zod schemas, KST ↔ UTC (`kstLocalToIso`, `isoToKstLocal`)                                                        |
+| `lib/format.ts`, `lib/event-status.ts`  | KST display formatting; `getEventPhase(event, now)`, RSVP labels                                                 |
+| `lib/safe-next.ts`                      | `sanitizeNext()` — the ONLY way to validate `next` redirect values                                               |
+| `lib/auth/`                             | Auth constants (`SOCIAL_PROVIDERS`, `LOGIN_SOCIAL_PROVIDERS`, `isSocialProviderEnabled`, `AUTH_PROVIDER_LABELS`) |
+| `lib/mock/`                             | Admin-screen dummy data ONLY (event screens use real queries). Delete in Task 009-1                              |
+| `lib/mock/role.ts`                      | Dev-only role switch cookie (delete in Task 009-1)                                                               |
+| `proxy.ts` (root)                       | Calls `updateSession()`. Next.js 16: NEVER create `middleware.ts`                                                |
+| `docs/guides/`                          | Read the matching guide before the related work                                                                  |
+| `shrimp_data/`                          | Task manager data. DO NOT edit manually                                                                          |
 
 ## Code Standards
 
@@ -77,9 +78,9 @@
 ## UI Rules
 
 - Add shadcn components with `npx shadcn@latest add <name>` (or shadcn MCP). DO NOT hand-write files in `components/ui/`. Config: `components.json`.
-- Planned domain components: `EventCard`, `RsvpButtons`, `AttendeeList`, `CapacityBadge`, `ShareLinkButton`. Place in `components/`.
+- Domain components live in `components/` (`EventCard`, `EventForm`, `EventCover`, `RsvpButtons`, `AttendeeList`, `CapacityBadge`, `ShareLinkButton`, `DeleteEventDialog`, `SocialLoginButtons`).
 - Read `docs/guides/component-patterns.md` and `docs/guides/styling-guide.md` before building components.
-- Phase 2 UI uses `lib/mock/` data. Replace with real queries in Task 007/008; delete mock usage when replaced.
+- Event screens read via `lib/queries/` and write via Server Actions. DO NOT import `lib/mock/` outside the admin screens (`app/admin/**`, `auth-button`, `user-menu` role toggle) — those are replaced in Task 009-1.
 
 ## Multi-file Coordination
 
@@ -97,7 +98,7 @@
 
 - Follow ROADMAP order (Task 001 → 010). Do one Task at a time.
 - API/business-logic tasks: test with Playwright MCP (E2E scenarios in a "## 테스트 체크리스트" section of the task).
-- Test accounts (from `CLAUDE.md`): user `gymcoding@gmail.com`, admin `bruce.lean17@gmail.com`. Use only for local/dev testing; DO NOT hardcode in source.
+- Browser testing that needs login: the linked Supabase project has only the user's own accounts (see `CLAUDE.md`). DO NOT create accounts or try other credentials; ask the user to log in in the Playwright window. Admin screens: set the dev-only `mock-role=admin` cookie until Task 009-1.
 - Completion gate after each task: `npm run check-all` AND `npm run build` must pass. Then stop and wait for user instruction.
 - Git: pre-commit runs lint-staged; pre-push runs `npm run typecheck`. DO NOT use `--no-verify`. Commit messages follow `.claude/commands/git/commit.md` (emoji + conventional). Commit only when asked.
 
@@ -116,7 +117,7 @@
 - Global/module-level Supabase client instances.
 - Code between `createServerClient` and `getClaims()` in `lib/supabase/proxy.ts`.
 - Tables without RLS; DDL through `execute_sql`; skipping `get_advisors`.
-- Implementing 카풀/정산/알림/Group in MVP.
+- Implementing 카풀/정산/알림/Group or Naver login in MVP (post-MVP roadmap; the Naver button stays hidden via `HIDDEN_SOCIAL_PROVIDERS`).
 - Editing `components/ui/*` by hand, `shrimp_data/*`, or `package-lock.json` by hand.
 - Adding Tailwind v4 syntax or new styling libraries.
 - Redirecting to unvalidated `next` values.

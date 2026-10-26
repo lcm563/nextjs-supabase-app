@@ -11,14 +11,12 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import { deleteEvent } from "@/app/events/actions";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Trash2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { toast } from "sonner";
-
-// 모의 삭제 지연 (Task 007에서 제거)
-const MOCK_DELAY_MS = 300;
 
 // 이벤트 삭제 확인 대화상자
 export function DeleteEventDialog({
@@ -32,14 +30,16 @@ export function DeleteEventDialog({
   const [open, setOpen] = useState(false);
   const [isPending, startTransition] = useTransition();
 
-  const deleteEvent = (e: React.MouseEvent) => {
+  const handleDelete = (e: React.MouseEvent) => {
     // 처리가 끝날 때까지 대화상자를 열어둔다
     e.preventDefault();
 
     startTransition(async () => {
-      // TODO(Task 007): deleteEvent Server Action 호출로 교체 (eventId)
-      void eventId;
-      await new Promise((resolve) => setTimeout(resolve, MOCK_DELAY_MS));
+      const result = await deleteEvent(eventId);
+      if (!result.success) {
+        toast.error(result.error.message);
+        return;
+      }
 
       toast.success("이벤트를 삭제했습니다");
       setOpen(false);
@@ -71,7 +71,7 @@ export function DeleteEventDialog({
         <AlertDialogFooter>
           <AlertDialogCancel disabled={isPending}>취소</AlertDialogCancel>
           <AlertDialogAction
-            onClick={deleteEvent}
+            onClick={handleDelete}
             disabled={isPending}
             className={buttonVariants({ variant: "destructive" })}
           >

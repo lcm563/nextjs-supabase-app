@@ -17,6 +17,7 @@ export type Database = {
       events: {
         Row: {
           capacity: number | null;
+          cover_image_path: string | null;
           created_at: string;
           description: string | null;
           ends_at: string | null;
@@ -30,6 +31,7 @@ export type Database = {
         };
         Insert: {
           capacity?: number | null;
+          cover_image_path?: string | null;
           created_at?: string;
           description?: string | null;
           ends_at?: string | null;
@@ -43,6 +45,7 @@ export type Database = {
         };
         Update: {
           capacity?: number | null;
+          cover_image_path?: string | null;
           created_at?: string;
           description?: string | null;
           ends_at?: string | null;
@@ -132,7 +135,24 @@ export type Database = {
       [_ in never]: never;
     };
     Functions: {
-      [_ in never]: never;
+      promote_waitlist: { Args: { p_event_id: string }; Returns: number };
+      respond_to_event: {
+        Args: { p_event_id: string; p_status: string };
+        Returns: {
+          created_at: string;
+          event_id: string;
+          id: string;
+          status: string;
+          updated_at: string;
+          user_id: string;
+        };
+        SetofOptions: {
+          from: "*";
+          to: "rsvps";
+          isOneToOne: true;
+          isSetofReturn: false;
+        };
+      };
     };
     Enums: {
       [_ in never]: never;
