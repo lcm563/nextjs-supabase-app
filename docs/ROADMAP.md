@@ -232,7 +232,14 @@
   - ✅ `get_advisors` 재점검: performance는 `event_reports_reporter_id_idx` 미사용(INFO)만 — 프로필 삭제 cascade용 외래 키 인덱스라 유지(지우면 `unindexed_foreign_keys` 경고로 바뀜). security는 기존에 기록한 의도된 security definer 경고와 유출 비밀번호 보호 비활성(Dashboard 설정, Task 010-b에서 사용자 작업)
   - 알려진 한계(현 규모에서는 문제 없음): 한 사용자가 수천 개 이벤트에 응답하면 `getMyEvents`의 `.in("id", …)` URL이 길어진다. 신고 관리는 탭 개수 때문에 신고 전체를 읽는다
   - ✅ `npm run check-all`, `npm run build` 통과 확인
-  - Vercel 배포, 환경 변수·Supabase Auth 리다이렉트 URL 설정
+  - ✅ Vercel 배포, 환경 변수·Supabase Auth 리다이렉트 URL 설정 (Task 010-b, 2026-10-27) — https://nextjs-supabase-app-swart.vercel.app
+    - 구성: Vercel Hobby, Production은 `main`(Preview는 같은 Supabase를 쓰므로 화면 확인용만), 함수 리전 `sin1`(`vercel.json`, Supabase `ap-southeast-1`과 같은 싱가포르) — 응답 헤더 `icn1::sin1` 확인
+    - 환경 변수 3개(Production·Preview), Supabase Site URL·Redirect URLs(`/auth/callback**`, `/auth/confirm**`) 등록. Google·Kakao 콘솔은 Supabase 콜백을 쓰므로 변경 없음. 절차는 README "Vercel 배포"
+    - 배포 중 수정: 공유 미리보기 `og:image`가 배포별 주소(`VERCEL_URL`, Vercel 배포 보호로 302)를 가리켜 Production은 `VERCEL_PROJECT_PRODUCTION_URL` 기준으로 변경 → 200
+    - 비밀번호 정책: Supabase 최소 길이 8자(사용자 설정)와 앱 `PASSWORD_MIN_LENGTH` 일치, 인증 오류 한국어 안내(`authErrorMessage`), 비밀번호 재설정 화면 한국어화. 유출 비밀번호 보호는 Pro 플랜 기능이라 Free 플랜에서 미적용
+    - 배포 URL 점검(관리자 계정): 비로그인 이벤트 링크 → Google 로그인 → 원래 이벤트 복귀, 커버 포함 생성(Storage 업로드·이미지 최적화 200), 공유 링크(Production 도메인) 복사, 참석(정원 1 마감), 수정, 삭제(응답·커버 파일 정리, 삭제된 링크 404), 관리자 대시보드 수치 = SQL 집계, 점검 스크립트 19개 화면 × 360·1280 × 라이트·다크(76조합) 문제·콘솔 오류 0. 테스트 이벤트는 삭제
+    - 일반 계정 Kakao 로그인: 사용자 메뉴에 관리자 링크 없음, `/admin` 404. 이메일 로그인은 로컬에서 확인한 흐름과 같아 배포에서는 생략(차이는 Redirect URL뿐이며 Google·Kakao로 확인)
+    - 사용자 피드백 반영: 로그인한 상태에서 랜딩 "무료로 시작하기"가 가입 화면으로 보내던 흐름 수정 — 랜딩 버튼을 로그인 여부에 따라 "이벤트 만들기·내 이벤트 보기" / "무료로 시작하기·로그인"으로(`LandingActions`, 정적 쉘 유지), 로그인·가입 화면은 이미 로그인했으면 `next`(기본 `/events`)로 이동
   - 커스텀 SMTP 설정(기본 SMTP는 발송 한도가 낮고 메일 템플릿을 수정할 수 없음) → 가입 확인·비밀번호 재설정 템플릿을 `token_hash` 방식(`{{ .RedirectTo }}&token_hash={{ .TokenHash }}&type=email|recovery`)과 한국어 문구로 변경. 다른 기기에서 링크를 열어도 바로 로그인되며, `/auth/confirm`은 이미 두 방식을 모두 처리한다 (Task 006 결정)
   - 성공 지표(응답률, 링크→응답 전환율, 주최자 재사용) 측정 방안 정리
 
