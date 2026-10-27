@@ -136,7 +136,7 @@
 
 ---
 
-## 7. 데이터 모델 (초안)
+## 7. 데이터 모델
 
 > 확정 설계안(제약·인덱스·RLS·트리거·`respond_to_event` RPC·타임존 규약)은 [DB_SCHEMA.md](./DB_SCHEMA.md)를 따른다.
 
@@ -145,6 +145,7 @@ profiles (
   id          uuid primary key references auth.users on delete cascade,
   display_name text not null,
   avatar_url  text,
+  role        text not null default 'user',  -- 'user' | 'admin' (관리자 RPC로만 변경)
   created_at  timestamptz default now()
 )
 
@@ -158,6 +159,9 @@ events (
   ends_at       timestamptz,
   capacity      int check (capacity > 0),      -- null = 무제한
   rsvp_deadline timestamptz,
+  cover_image_path text,                       -- Storage 'event-covers' 경로
+  hidden_at     timestamptz,                   -- 관리자 숨김 (null = 공개)
+  hidden_reason text,
   created_at    timestamptz default now(),
   updated_at    timestamptz default now()
 )
@@ -171,15 +175,30 @@ rsvps (
   updated_at timestamptz default now(),
   unique (event_id, user_id)
 )
+
+event_reports (
+  id          uuid primary key default gen_random_uuid(),
+  event_id    uuid not null references events(id) on delete cascade,
+  reporter_id uuid not null references profiles(id) on delete cascade,
+  reason      text not null,                  -- spam | inappropriate | misleading | other
+  detail      text,
+  status      text not null default 'open',   -- open | resolved | dismissed
+  created_at  timestamptz default now(),
+  resolved_at timestamptz,
+  unique (event_id, reporter_id)
+)
 ```
 
 ### RLS 정책
 
-| 테이블   | SELECT        | INSERT                                 | UPDATE | DELETE |
-| -------- | ------------- | -------------------------------------- | ------ | ------ |
-| profiles | 로그인 사용자 | 본인                                   | 본인   | —      |
-| events   | 로그인 사용자 | 로그인 사용자 (`host_id = auth.uid()`) | 주최자 | 주최자 |
-| rsvps    | 로그인 사용자 | 본인                                   | 본인   | 본인   |
+| 테이블        | SELECT                                               | INSERT                                 | UPDATE             | DELETE        |
+| ------------- | ---------------------------------------------------- | -------------------------------------- | ------------------ | ------------- |
+| profiles      | 로그인 사용자 (`role` 제외)                          | 본인                                   | 본인 (이름·아바타) | —             |
+| events        | 공개 이벤트 + 숨김은 주최자·관리자 (`hidden_*` 제외) | 로그인 사용자 (`host_id = auth.uid()`) | 주최자             | 주최자·관리자 |
+| rsvps         | 로그인 사용자                                        | RPC로만                                | RPC로만            | —             |
+| event_reports | 관리자                                               | 본인 명의                              | 관리자             | —             |
+
+- 관리자 판정은 `is_admin()`(`profiles.role`)이고, 숨김·역할 변경·신고 기각·통계·사용자 목록은 관리자 RPC로만 한다. 숨김 상태는 주최자·관리자에게만 RPC로 제공한다.
 
 - 정원 판정과 대기자 승격은 **동시성 문제**가 있으므로 DB 함수(RPC) 또는 트리거로 트랜잭션 처리한다.
 - 가입 시 `profiles` 자동 생성은 `auth.users` 트리거로 처리한다.

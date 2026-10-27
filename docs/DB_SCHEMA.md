@@ -1,14 +1,15 @@
 # DB 스키마 설계안
 
 > 기준: [PRD.md](./PRD.md) 7장 데이터 모델 · 작성: Task 002 (설계만, 구현 제외)
-> 1~5장은 **Task 005에서 적용 완료**(2026-10-25, 마이그레이션 `create_core_tables`·`profiles_on_signup`·`core_rls`·`core_table_grants`). 7장 RPC·정원 트리거는 **Task 008-a에서 적용 완료**(2026-10-26, `rsvp_rpc`), 9-1 커버 이미지는 **Task 007-1a에서 적용 완료**(2026-10-26, `event_covers`·`event_covers_select_own`). 나머지 9장은 각 Task에서 적용합니다.
+> 1~5장은 **Task 005에서 적용 완료**(2026-10-25, 마이그레이션 `create_core_tables`·`profiles_on_signup`·`core_rls`·`core_table_grants`). 7장 RPC·정원 트리거는 **Task 008-a에서 적용 완료**(2026-10-26, `rsvp_rpc`), 9-1 커버 이미지는 **Task 007-1a에서 적용 완료**(2026-10-26, `event_covers`·`event_covers_select_own`), 9-2~9-5 관리자는 **Task 009-1에서 적용 완료**(2026-10-27, `admin_roles`·`event_hiding`·`event_reports`·`event_covers_admin_cleanup`·`seed_first_admin`·`hide_moderation_columns`·`admin_rpc`), 9-6 소셜 프로필은 Task 005에서 적용했습니다. **9장 전체가 적용 완료**입니다.
 > 적용 순서: Supabase MCP `apply_migration` → `get_advisors` → `generate_typescript_types`(`lib/supabase/database.types.ts`).
 
 ## 1. 결정 요약
 
 | 항목        | 결정                                                                                      |
 | ----------- | ----------------------------------------------------------------------------------------- |
-| 테이블      | `profiles`, `events`, `rsvps` 3개 (PRD 7장과 동일)                                        |
+| 테이블      | `profiles`, `events`, `rsvps` 3개 (PRD 7장과 동일) + 관리자용 `event_reports` (9-4)       |
+| 관리자      | `profiles.role` + `is_admin()`. 쓰기는 관리자 RPC로만, `role`·`hidden_*`는 직접 조회 불가 |
 | 컬럼 이름   | snake_case. 앱 타입(`types/`)과 zod 스키마(`lib/validations/`)도 같은 이름을 쓴다         |
 | 시간 저장   | 모든 일시는 `timestamptz`(UTC 저장). 입력은 한국 시간으로 해석 → [6장](#6-타임존-규약)    |
 | 정원·대기자 | DB 함수 `respond_to_event`가 이벤트 행 잠금 안에서 처리 (앱 코드에서 읽고-쓰기 금지)      |
@@ -243,16 +244,19 @@ grant execute on function public.respond_to_event(uuid, text) to authenticated;
 
 ## 8. 앱 코드와의 대응
 
-| DB                      | 앱                                                                   |
-| ----------------------- | -------------------------------------------------------------------- |
-| `profiles` 행           | `Profile` (`types/event.ts`)                                         |
-| `events` 행             | `Event` (`types/event.ts`)                                           |
-| `events` 입력 컬럼 7개  | `EventInput`, 검증은 `eventInputSchema` (`lib/validations/event.ts`) |
-| `rsvps.status`          | `RsvpStatus`, 사용자 선택은 `RsvpChoice` (`types/rsvp.ts`)           |
-| `respond_to_event` 인자 | `rsvpInputSchema` (`lib/validations/rsvp.ts`)                        |
-| 상태별 인원 집계        | `EventWithCounts.rsvp_counts` — Task 005에서 뷰/RPC 형태 확정        |
+| DB                      | 앱                                                                      |
+| ----------------------- | ----------------------------------------------------------------------- |
+| `profiles` 행           | `Profile` (`types/event.ts`)                                            |
+| `events` 행             | `Event` (`types/event.ts`)                                              |
+| `events` 입력 컬럼 7개  | `EventInput`, 검증은 `eventInputSchema` (`lib/validations/event.ts`)    |
+| `rsvps.status`          | `RsvpStatus`, 사용자 선택은 `RsvpChoice` (`types/rsvp.ts`)              |
+| `respond_to_event` 인자 | `rsvpInputSchema` (`lib/validations/rsvp.ts`)                           |
+| 상태별 인원 집계        | `EventWithCounts.rsvp_counts` — Task 005에서 뷰/RPC 형태 확정           |
+| `events.hidden_*`       | `get_event_hidden_states` → `lib/queries/events.ts`의 `getHiddenStates` |
+| 관리자 RPC              | `lib/queries/admin.ts`(조회), `app/admin/actions.ts`(쓰기)              |
+| `event_reports` 입력    | `reportInputSchema` + `reportEvent` (`app/events/[id]/actions.ts`)      |
 
-`database.types.ts`는 Task 005에서 생성하고 스키마 변경마다 다시 생성했으며(최근: Task 008-a·007-1a), 세 Supabase 클라이언트(`server`·`client`·`proxy`)에 `Database` 제네릭을 적용했다. 다만 앱 타입(`types/event.ts`)에는 아직 DB에 없는 컬럼(`hidden_*`, `role`)과 파생 값(`cover_image_url`)이 있어서 조회 계층(`lib/queries/`, Task 007)이 매핑한다. `Tables<"events">` 파생으로 바꾸는 것은 해당 컬럼이 모두 생기는 Task 009-1 이후로 미룬다.
+`database.types.ts`는 Task 005에서 생성하고 스키마 변경마다 다시 생성했으며(최근: Task 009-1b), 세 Supabase 클라이언트(`server`·`client`·`proxy`)에 `Database` 제네릭을 적용했다. `role`·`hidden_*`는 생성 타입에는 있지만 `authenticated`가 직접 SELECT할 수 없으므로, 조회 계층은 `events`를 `*` 대신 컬럼을 나열해 읽고 숨김 상태는 RPC로 채운다(9-5 적용 결과). 파생 값(`cover_image_url`)도 조회 계층이 매핑하므로 앱 타입(`types/event.ts`)은 `Tables<"events">` 파생으로 바꾸지 않고 유지한다.
 
 ## 9. 추가 기능 설계안
 
