@@ -174,41 +174,64 @@
 
 ### Phase 4: 고급 기능 및 최적화
 
-- **Task 009: P1 기능 구현**
-  - 이벤트 복제 (`/events/new?copy=[id]`, 일시만 새로 지정) — F-10
-  - 내 이벤트 목록 (`내가 주최` / `내가 참여`) — F-11
-  - 응답 마감 시각 이후 변경 차단 및 안내, 종료된 이벤트 응답 차단 — F-12, F-14
-  - `수정됨` 배지와 수정 시각 표시 — F-13
-  - Playwright MCP로 마감·종료 이벤트 응답 차단 테스트
+- **Task 009: P1 기능 구현** ✅ - 완료 (Phase 2·3에서 구현, 실데이터로 수용 기준 재확인 — 코드 변경 없음)
+  - ✅ 이벤트 복제 (`/events/new?copy=[id]`, 일시만 새로 지정) — F-10
+  - ✅ 내 이벤트 목록 (`내가 주최` / `내가 참여`) — F-11
+  - ✅ 응답 마감 시각 이후 변경 차단 및 안내, 종료된 이벤트 응답 차단 — F-12, F-14
+  - ✅ `수정됨` 배지와 수정 시각 표시 — F-13
+  - ✅ Playwright MCP로 마감·종료 이벤트 응답 차단 테스트
+  - P1 수용 기준 점검 (PRD 5장, 테스트 이벤트 7개를 SQL로 만들어 확인 후 삭제)
 
-- **Task 009-1: 관리자 화면 (Admin)**
+    | 기능                  | 결과 | 확인 내용                                                                                     |
+    | --------------------- | ---- | --------------------------------------------------------------------------------------------- |
+    | F-10 이벤트 복제      | ✅   | 제목·장소·정원·공지 채움, 시작·종료·마감 일시는 비움, 커버 미복사 안내                        |
+    | F-11 내 이벤트 목록   | ✅   | 주최·참여 탭과 개수, 다가오는 이벤트는 시작 오름차순                                          |
+    | F-12 응답 마감        | ✅   | 버튼 3개 비활성 + "응답이 마감되었습니다", Server Action·RPC 직접 호출 시 `DEADLINE_PASSED`   |
+    | F-13 공지 수정 표시   | ✅   | 생성 60초 뒤 수정 시 카드·상세에 `수정됨` 배지, 상세에 수정 시각                              |
+    | F-14 지난 이벤트 구분 | ✅   | "지난 이벤트" 섹션(시작 내림차순)·`종료` 배지, 버튼 비활성 + 안내, 직접 호출 시 `EVENT_ENDED` |
+
+- **Task 009-1: 관리자 화면 (Admin)** ✅ - 완료 (세부 결과: [DB_SCHEMA.md](./DB_SCHEMA.md) 9-2~9-5 적용 결과)
   - UI·목업은 Task 004-2, 라우트 골격은 Task 002-1에서 완료 — 이 Task는 권한 모델·RPC 연동과 개발용 역할 전환 삭제
-  - 권한 모델: `profiles.role text not null default 'user'` (`user | admin`), `public.is_admin()` 함수 (security definer, `set search_path = ''`, stable)
-    - 본인 `role` 수정 금지(컬럼 권한 회수 또는 트리거), 역할 변경은 RPC `admin_set_user_role`로만 (마지막 관리자 해제 방지)
-    - 권한 판단에 `user_metadata`(사용자 수정 가능) 사용 금지, `service_role` 키 미사용
-  - 초기 관리자: `CLAUDE.md`의 관리자 테스트 계정을 데이터 마이그레이션으로 지정 (비밀번호는 문서에 기록하지 않음)
-  - 숨김·신고
-    - `events.hidden_at timestamptz`, `hidden_reason text` — 숨김 이벤트는 주최자·관리자만 조회(RLS), 일반 목록·상세에서 제외, 복구 가능
-    - `event_reports` 테이블 (신고자, 사유, 상태 `open | resolved | dismissed`) — 로그인 사용자는 신고 생성만, 조회·처리는 관리자만
-  - 관리자 RPC (모두 내부에서 `is_admin()` 확인)
-    - `admin_list_users()`: 이메일·가입 방식(provider)·가입일·최근 로그인·역할 (`auth.users` 조인)
-    - `admin_stats()`: 가입자·이벤트·응답 수, 응답률
-    - `admin_set_event_hidden()`: 이벤트 숨김·복구
-  - 이벤트 강제 삭제: events DELETE 정책에 `or (select public.is_admin())` 추가
-  - 관리자 게이트(`app/admin/layout.tsx`)·사용자 메뉴의 판정을 개발용 역할 쿠키에서 `is_admin()`으로 교체
-  - 관리자 화면 4종과 신고 대화상자의 목업 동작을 RPC·쿼리로 교체
-  - `get_advisors` 점검, `database.types.ts` 재생성, PRD·DB_SCHEMA.md 반영
-  - 테스트 체크리스트 (Playwright MCP, 일반 계정·관리자 계정)
-    - [ ] 일반 계정으로 `/admin` 접근 시 404, 관리자 RPC 직접 호출 차단
-    - [ ] 관리자가 이벤트 숨김 → 일반 사용자 목록·상세에서 사라짐 → 복구
-    - [ ] 신고 생성 → 관리자 신고 목록 표시 → 처리(숨김/기각)
-    - [ ] 역할 부여·해제, 마지막 관리자 해제 차단
-    - [ ] 이벤트 강제 삭제 및 통계 수치 확인
+  - ✅ 권한 모델: `profiles.role text not null default 'user'` (`user | admin`), `public.is_admin()` 함수 (security definer, `set search_path = ''`, stable)
+    - ✅ 본인 `role` 수정 금지(UPDATE 컬럼 권한을 이름·아바타로 한정), 역할 변경은 RPC `admin_set_user_role`로만 (마지막 관리자 해제 시 `LAST_ADMIN`)
+    - ✅ 권한 판단에 `user_metadata`(사용자 수정 가능) 사용 금지, `service_role` 키 미사용
+    - ✅ (사용자 요청) `role`·`hidden_*` 컬럼은 로그인 사용자가 직접 조회할 수 없게 SELECT 권한에서 제외. 숨김 상태는 주최자·관리자에게만 RPC `get_event_hidden_states`로 제공
+  - ✅ 초기 관리자: 사용자 본인 계정(`lcm563@naver.com`)을 데이터 마이그레이션으로 지정 (비밀번호는 문서에 기록하지 않음)
+  - ✅ 숨김·신고
+    - ✅ `events.hidden_at timestamptz`, `hidden_reason text` — 숨김 이벤트는 주최자·관리자만 조회(RLS), 일반 목록·상세에서 제외, 응답 거부(`FORBIDDEN`), 복구 가능. 숨김·해제는 `수정됨`으로 보이지 않도록 `updated_at` 트리거를 내용 컬럼으로 한정
+    - ✅ `event_reports` 테이블 (신고자, 사유, 상태 `open | resolved | dismissed`) — 로그인 사용자는 신고 생성만(중복은 `ALREADY_REPORTED`), 조회·처리는 관리자만
+  - ✅ 관리자 RPC (모두 내부에서 `is_admin()` 확인, 아니면 `FORBIDDEN`)
+    - ✅ `admin_list_users()`: 이메일·가입 방식(provider)·가입일·최근 로그인·역할 (`auth.users` 조인, 검색·페이지)
+    - ✅ `admin_stats()`: 가입자(이번 주 신규)·예정/종료/숨김 이벤트·응답·처리 대기 신고·가입 방식별 수
+    - ✅ `admin_set_event_hidden()`: 이벤트 숨김(사유 필수)·복구, 숨기면 해당 이벤트의 처리 대기 신고를 `resolved`로
+    - ✅ `admin_set_user_role()`, `admin_dismiss_report()`
+  - ✅ 이벤트 강제 삭제: events DELETE 정책에 `or (select public.is_admin())` 추가, 다른 사용자 커버도 Storage 관리자 정책으로 정리
+  - ✅ 관리자 게이트(`app/admin/layout.tsx`)·사용자 메뉴의 판정을 개발용 역할 쿠키에서 `is_admin()`으로 교체
+  - ✅ 관리자 화면 4종(`lib/queries/admin.ts`, `app/admin/actions.ts`)과 신고 대화상자(`reportEvent`)의 목업 동작을 RPC·쿼리로 교체, `lib/mock` 삭제
+  - ✅ `get_advisors` 점검(신규 경고는 관리자·숨김 RPC의 security definer 실행 경고뿐 — 함수 안에서 권한 확인하는 의도된 예외), `database.types.ts` 재생성, PRD·DB_SCHEMA.md 반영
+  - 테스트 체크리스트 (Playwright MCP 관리자 계정 + 일반 계정 시점은 SQL 롤백, 테스트 이벤트는 확인 후 삭제)
+    - [x] 일반 계정으로 `/admin` 접근 시 404, 관리자 RPC 직접 호출 차단 — 브라우저 404(Task 009-1c), 비로그인은 로그인으로 이동, RPC 5종 `FORBIDDEN`·신고 조회 0건·`role`/`hidden_at` 조회 `42501`
+    - [x] 관리자가 이벤트 숨김 → 일반 사용자 목록·상세에서 사라짐 → 복구 — 사유 없으면 차단, 숨김 중 참여자 목록·상세 0건·응답 `FORBIDDEN`, 복구 후 다시 1건
+    - [x] 신고 생성 → 관리자 신고 목록 표시 → 처리(숨김/기각) — 상세 내용 빈 신고 저장, 중복 신고 안내, 숨김 처리 시 사유 `신고 처리: <사유>`·신고 `resolved`, 기각 `dismissed`
+    - [x] 역할 부여·해제, 마지막 관리자 해제 차단 — 버튼 잠금 + Server Action 직접 호출 `LAST_ADMIN`, 첫 관리자 역할 유지 확인
+    - [x] 이벤트 강제 삭제 및 통계 수치 확인 — 다른 사용자 이벤트와 Storage 커버 삭제, 신고 cascade, 대시보드 6개 지표가 SQL 집계와 일치(작업 전·후)
+  - ✅ 점검 스크립트(`.playwright-mcp/audit-phase3.js`, 역할 쿠키 제거·관리자 세션): 21개 화면 × 360·1280px × 라이트·다크(84조합) 대비·가로 넘침·터치 영역·콘솔 오류 0건
+
+- **추가: UI 테마 변경** ✅ - 완료 (사용자 요청)
+  - ✅ tweakcn "Clean Slate"(slate 배경 + indigo primary)를 Tailwind v3 HSL 토큰으로 변환해 `app/globals.css`에 적용
+  - ✅ WCAG AA 미달 토큰(`primary`, `muted-foreground`, `destructive`)은 밝기만 조정, 인증 폼 오류 문구를 `text-destructive`로 통일
+  - ✅ 76조합 대비 점검 0건 (폰트 Geist·그림자는 유지)
 
 - **Task 010: 성능 최적화 및 배포**
-  - Server Component 중심 렌더링 점검, 필요한 곳에 Cache Components(`use cache`) 적용
-  - 인덱스 추가(`rsvps(event_id)`, `events(host_id, starts_at)`) 및 `get_advisors` 재점검
-  - `npm run check-all`, `npm run build` 통과 확인
+  - ✅ Server Component 중심 렌더링 점검 (Task 010-a) — 측정 근거가 있는 항목만 최적화
+    - 빌드: 사용자 화면 전부 Partial Prerender(◐, 정적 쉘 + Suspense 안에서 요청 시점 데이터), OG 이미지만 정적(○), 인증 콜백·확인 Route Handler만 동적(ƒ)
+    - `use cache` 미적용: 목록·상세·관리자는 로그인 사용자별 데이터이고 RLS·응답 상태에 따라 결과가 달라 공유 캐시 대상이 아니다. 랜딩·인증 화면은 이미 정적 쉘로 프리렌더되고, 쿠키를 읽는 헤더(`AuthButton`)만 Suspense로 스트리밍하므로 추가 캐시 이득이 없다
+  - ✅ 이미지 LCP: 목록 첫 카드 커버가 LCP인데 지연 로딩이라 Next 경고 발생 → 첫 화면 카드 2개(데스크톱 첫 줄)는 `loading="eager"`, 상세 상단 커버는 Next 16에서 deprecated된 `priority` 대신 `preload` (`EventCover`의 `loadingMode`). 360·1280px 재측정 시 LCP 경고 0
+  - ✅ 인덱스·쿼리 점검: `events(host_id, starts_at)`, `rsvps(event_id)`, `rsvps(user_id)`, 대기자 부분 인덱스, `event_reports` 외래 키 인덱스가 이미 있음. 이벤트 2000개·응답 4000개 합성 데이터(롤백)로 내 이벤트·내 응답·상세 쿼리 모두 인덱스 스캔 1ms 안팎. RLS 정책은 모두 `(select auth.uid())`·`(select is_admin())` 형태라 행마다 재평가되지 않음 → 인덱스 추가 없음
+  - ✅ 관리자 이벤트 목록 규모 대응: 전체 조회가 2000개 기준 응답 약 1MB·표 2000행이라, 검색·공개 상태 필터·정렬·개수를 DB에서 처리하는 관리자 RPC `admin_list_events`(최대 100건, 시작 최신순, 4.6ms)로 교체하고 "N건 중 최근 100건 표시" 안내. 그 이전 이벤트는 검색으로 찾는다 (사용자 목록과 같은 방식)
+  - ✅ `get_advisors` 재점검: performance는 `event_reports_reporter_id_idx` 미사용(INFO)만 — 프로필 삭제 cascade용 외래 키 인덱스라 유지(지우면 `unindexed_foreign_keys` 경고로 바뀜). security는 기존에 기록한 의도된 security definer 경고와 유출 비밀번호 보호 비활성(Dashboard 설정, Task 010-b에서 사용자 작업)
+  - 알려진 한계(현 규모에서는 문제 없음): 한 사용자가 수천 개 이벤트에 응답하면 `getMyEvents`의 `.in("id", …)` URL이 길어진다. 신고 관리는 탭 개수 때문에 신고 전체를 읽는다
+  - ✅ `npm run check-all`, `npm run build` 통과 확인
   - Vercel 배포, 환경 변수·Supabase Auth 리다이렉트 URL 설정
   - 커스텀 SMTP 설정(기본 SMTP는 발송 한도가 낮고 메일 템플릿을 수정할 수 없음) → 가입 확인·비밀번호 재설정 템플릿을 `token_hash` 방식(`{{ .RedirectTo }}&token_hash={{ .TokenHash }}&type=email|recovery`)과 한국어 문구로 변경. 다른 기기에서 링크를 열어도 바로 로그인되며, `/auth/confirm`은 이미 두 방식을 모두 처리한다 (Task 006 결정)
   - 성공 지표(응답률, 링크→응답 전환율, 주최자 재사용) 측정 방안 정리

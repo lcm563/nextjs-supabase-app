@@ -1,14 +1,15 @@
 # DB 스키마 설계안
 
 > 기준: [PRD.md](./PRD.md) 7장 데이터 모델 · 작성: Task 002 (설계만, 구현 제외)
-> 1~5장은 **Task 005에서 적용 완료**(2026-10-25, 마이그레이션 `create_core_tables`·`profiles_on_signup`·`core_rls`·`core_table_grants`). 7장 RPC·정원 트리거는 **Task 008-a에서 적용 완료**(2026-10-26, `rsvp_rpc`), 9-1 커버 이미지는 **Task 007-1a에서 적용 완료**(2026-10-26, `event_covers`·`event_covers_select_own`). 나머지 9장은 각 Task에서 적용합니다.
+> 1~5장은 **Task 005에서 적용 완료**(2026-10-25, 마이그레이션 `create_core_tables`·`profiles_on_signup`·`core_rls`·`core_table_grants`). 7장 RPC·정원 트리거는 **Task 008-a에서 적용 완료**(2026-10-26, `rsvp_rpc`), 9-1 커버 이미지는 **Task 007-1a에서 적용 완료**(2026-10-26, `event_covers`·`event_covers_select_own`), 9-2~9-5 관리자는 **Task 009-1에서 적용 완료**(2026-10-27, `admin_roles`·`event_hiding`·`event_reports`·`event_covers_admin_cleanup`·`seed_first_admin`·`hide_moderation_columns`·`admin_rpc`), 9-6 소셜 프로필은 Task 005에서 적용했습니다. **9장 전체가 적용 완료**입니다.
 > 적용 순서: Supabase MCP `apply_migration` → `get_advisors` → `generate_typescript_types`(`lib/supabase/database.types.ts`).
 
 ## 1. 결정 요약
 
 | 항목        | 결정                                                                                      |
 | ----------- | ----------------------------------------------------------------------------------------- |
-| 테이블      | `profiles`, `events`, `rsvps` 3개 (PRD 7장과 동일)                                        |
+| 테이블      | `profiles`, `events`, `rsvps` 3개 (PRD 7장과 동일) + 관리자용 `event_reports` (9-4)       |
+| 관리자      | `profiles.role` + `is_admin()`. 쓰기는 관리자 RPC로만, `role`·`hidden_*`는 직접 조회 불가 |
 | 컬럼 이름   | snake_case. 앱 타입(`types/`)과 zod 스키마(`lib/validations/`)도 같은 이름을 쓴다         |
 | 시간 저장   | 모든 일시는 `timestamptz`(UTC 저장). 입력은 한국 시간으로 해석 → [6장](#6-타임존-규약)    |
 | 정원·대기자 | DB 함수 `respond_to_event`가 이벤트 행 잠금 안에서 처리 (앱 코드에서 읽고-쓰기 금지)      |
@@ -243,16 +244,19 @@ grant execute on function public.respond_to_event(uuid, text) to authenticated;
 
 ## 8. 앱 코드와의 대응
 
-| DB                      | 앱                                                                   |
-| ----------------------- | -------------------------------------------------------------------- |
-| `profiles` 행           | `Profile` (`types/event.ts`)                                         |
-| `events` 행             | `Event` (`types/event.ts`)                                           |
-| `events` 입력 컬럼 7개  | `EventInput`, 검증은 `eventInputSchema` (`lib/validations/event.ts`) |
-| `rsvps.status`          | `RsvpStatus`, 사용자 선택은 `RsvpChoice` (`types/rsvp.ts`)           |
-| `respond_to_event` 인자 | `rsvpInputSchema` (`lib/validations/rsvp.ts`)                        |
-| 상태별 인원 집계        | `EventWithCounts.rsvp_counts` — Task 005에서 뷰/RPC 형태 확정        |
+| DB                      | 앱                                                                      |
+| ----------------------- | ----------------------------------------------------------------------- |
+| `profiles` 행           | `Profile` (`types/event.ts`)                                            |
+| `events` 행             | `Event` (`types/event.ts`)                                              |
+| `events` 입력 컬럼 7개  | `EventInput`, 검증은 `eventInputSchema` (`lib/validations/event.ts`)    |
+| `rsvps.status`          | `RsvpStatus`, 사용자 선택은 `RsvpChoice` (`types/rsvp.ts`)              |
+| `respond_to_event` 인자 | `rsvpInputSchema` (`lib/validations/rsvp.ts`)                           |
+| 상태별 인원 집계        | `EventWithCounts.rsvp_counts` — Task 005에서 뷰/RPC 형태 확정           |
+| `events.hidden_*`       | `get_event_hidden_states` → `lib/queries/events.ts`의 `getHiddenStates` |
+| 관리자 RPC              | `lib/queries/admin.ts`(조회), `app/admin/actions.ts`(쓰기)              |
+| `event_reports` 입력    | `reportInputSchema` + `reportEvent` (`app/events/[id]/actions.ts`)      |
 
-`database.types.ts`는 Task 005에서 생성하고 스키마 변경마다 다시 생성했으며(최근: Task 008-a·007-1a), 세 Supabase 클라이언트(`server`·`client`·`proxy`)에 `Database` 제네릭을 적용했다. 다만 앱 타입(`types/event.ts`)에는 아직 DB에 없는 컬럼(`hidden_*`, `role`)과 파생 값(`cover_image_url`)이 있어서 조회 계층(`lib/queries/`, Task 007)이 매핑한다. `Tables<"events">` 파생으로 바꾸는 것은 해당 컬럼이 모두 생기는 Task 009-1 이후로 미룬다.
+`database.types.ts`는 Task 005에서 생성하고 스키마 변경마다 다시 생성했으며(최근: Task 009-1b), 세 Supabase 클라이언트(`server`·`client`·`proxy`)에 `Database` 제네릭을 적용했다. `role`·`hidden_*`는 생성 타입에는 있지만 `authenticated`가 직접 SELECT할 수 없으므로, 조회 계층은 `events`를 `*` 대신 컬럼을 나열해 읽고 숨김 상태는 RPC로 채운다(9-5 적용 결과). 파생 값(`cover_image_url`)도 조회 계층이 매핑하므로 앱 타입(`types/event.ts`)은 `Tables<"events">` 파생으로 바꾸지 않고 유지한다.
 
 ## 9. 추가 기능 설계안
 
@@ -341,6 +345,32 @@ create index event_reports_open_idx on public.event_reports (created_at) where s
 | UPDATE | `(select public.is_admin())` (상태 변경)                                 |
 | DELETE | 없음                                                                     |
 
+**9-2~9-4 적용 결과 (Task 009-1a, 2026-10-27)**
+
+- 마이그레이션: `admin_roles` → `event_hiding` → `event_reports` → `event_covers_admin_cleanup` → `seed_first_admin`.
+- **권한**
+  - `profiles`의 UPDATE 권한을 회수하고 `display_name`, `avatar_url` 컬럼에만 다시 줬다.
+  - `events`의 INSERT·UPDATE는 원래 컬럼 단위 권한이라 `hidden_*`가 들어가지 않는다.
+  - ~~`profiles`·`events`는 테이블 단위 SELECT 권한이 있어서 `role`·`hidden_*`를 바로 조회할 수 있다.~~ → Task 009-1b에서 조회를 막았다(9-5 적용 결과 참고).
+  - `is_admin()`은 `anon`·`public`에서 실행 권한을 회수하고 `authenticated`에만 줬다.
+- **정책 이름**: `events_select_visible`, `events_delete_host_or_admin`, `event_reports_select_admin`, `event_reports_insert_own`, `event_reports_update_admin`.
+  - `event_reports` 권한은 SELECT, INSERT(`event_id`, `reporter_id`, `reason`, `detail`), UPDATE(`status`, `resolved_at`)다.
+  - 신고자 `status`는 INSERT 컬럼 권한에 없어 기본값 `open`만 들어간다.
+  - 외래 키 cascade용으로 `event_reports_reporter_id_idx`를 추가했다.
+- **`respond_to_event`**: `NOT_FOUND` 다음, 종료·마감 판정 전에 숨김을 검사해 `FORBIDDEN`을 낸다.
+- **Storage(설계 추가)**: 관리자가 다른 사용자 이벤트를 강제 삭제하면 그 커버 객체도 지워야 한다. 그래서 `event_covers_select_own_or_admin`·`event_covers_delete_own_or_admin`으로 관리자를 허용했다. 9-1처럼 DELETE는 SELECT로 보이는 행에만 적용되므로 두 정책을 함께 바꿨다.
+- **첫 관리자**: 사용자 본인 계정(`lcm563@naver.com`). id는 환경마다 달라 이메일로 찾는다.
+- **검증**: DO 블록 하나에서 관리자 A와 일반 사용자 B로 전환하며 실행한 뒤 롤백했다.
+  - B: `is_admin()`이 false다. 본인 `role` 변경, 자기 이벤트의 `hidden_at` 변경은 권한 오류로 거부된다.
+  - B: 남의 숨김 이벤트는 0건, 자기 숨김 이벤트는 1건 보인다. 숨김 이벤트에 응답하면 `FORBIDDEN`이고, 남의 이벤트 DELETE는 0건이다.
+  - 신고: 중복 신고는 `23505`, 다른 사람 명의 신고와 `status` 지정은 `42501`로 거부된다. B는 신고 조회·수정이 0건이다.
+  - B의 커버는 본인 것만 보인다.
+  - A: `is_admin()`이 true다. B의 숨김 이벤트가 보이고, 신고 조회·처리가 각각 1건, 커버 조회 2건, B 커버 삭제 1건, B 이벤트 강제 삭제 1건이다.
+  - `anon`의 `is_admin()` 호출은 `42501`로 거부된다.
+- **`get_advisors`**
+  - security: `is_admin()`이 `authenticated_security_definer_function_executable` 경고로 나온다. RLS 정책과 관리자 게이트에서 로그인 사용자가 호출해야 하고, 함수는 호출자 본인의 역할만 반환하므로 **의도된 예외**다(`respond_to_event`와 같다).
+  - performance: 새 테이블의 `unused_index`(INFO)만 나온다.
+
 ### 9-5. 관리자 RPC
 
 모두 `security definer set search_path = ''`, 함수 첫 줄에서 `if not public.is_admin() then raise exception ... end if;`.
@@ -353,6 +383,54 @@ create index event_reports_open_idx on public.event_reports (created_at) where s
 | `admin_set_user_role(target, new_role)`            | 9-2 참고                                                                  |
 
 `auth.users`는 클라이언트에 노출되지 않으므로 관리자 사용자 목록은 반드시 이 RPC로 조회한다.
+
+**적용 결과 (Task 009-1b, 2026-10-27)**
+
+- 마이그레이션: `hide_moderation_columns` → `admin_rpc`.
+- **`role`·`hidden_*` 조회 차단(사용자 요청)**
+  - `profiles`·`events`의 테이블 단위 SELECT를 `authenticated`·`anon`에서 회수했다.
+  - 나머지 컬럼에만 SELECT를 다시 줬다. `profiles`는 `id, display_name, avatar_url, created_at`, `events`는 `hidden_*`를 뺀 12개 컬럼이다.
+  - 로그인 사용자가 `role`·`hidden_at`을 조회하거나 `select *`를 쓰면 `42501`로 거부된다. 앱 조회 계층(`lib/queries/events.ts`)은 `*` 대신 컬럼을 나열한다.
+  - RLS 정책식 안의 `hidden_at` 참조는 컬럼 권한과 무관하게 계속 동작한다.
+  - 본인이 관리자인지는 `is_admin()`, 사용자별 역할은 `admin_list_users`로만 알 수 있다.
+- **`get_event_hidden_states(p_event_ids uuid[])`**: 숨긴 이벤트의 `hidden_at`·`hidden_reason`을 **주최자 본인과 관리자에게만** 돌려준다. 행이 없으면 숨김이 아니다. 상세 숨김 배너와 관리자 이벤트 목록에서 쓴다(Task 009-1c).
+- **RPC 5종**: 모두 `security definer set search_path = ''`이고, 첫 단계에서 `is_admin()`이 아니면 `FORBIDDEN`이다. 실행 권한은 `public`·`anon`에서 회수하고 `authenticated`에만 줬다.
+  - `admin_list_users(p_search, p_limit = 20, p_offset = 0)`
+    - 반환: `id, display_name, email, provider, role, created_at, last_sign_in_at, total_count`
+    - `provider`는 `auth.identities` 중 `email`이 아닌 가장 먼저 연결된 provider이고, 없으면 `email`이다.
+    - 검색은 표시 이름·이메일 `ilike`이며, `%`·`_`는 글자 그대로 찾는다. `limit`이 1~100을 벗어나거나 `offset`이 음수면 `VALIDATION`이다.
+  - `admin_stats()`: json을 반환한다. 이번 주는 `date_trunc('week', 한국 시간)`이라 월요일 0시부터다. 예정·종료 수는 숨김 이벤트를 포함하고 숨김 수는 따로 센다. `users_by_provider`는 4개 키를 항상 포함한다.
+  - `admin_set_event_hidden(p_event_id, p_hidden, p_reason)`
+    - 숨길 때는 사유(공백 제외 1~200자)가 필요하고, 없으면 `VALIDATION`이다. 없는 이벤트는 `NOT_FOUND`다.
+    - 숨기면 그 이벤트의 `open` 신고를 `resolved`로 바꾼다. 해제하면 `hidden_*`를 null로 되돌린다.
+  - `admin_set_user_role(p_target, p_role)`
+    - 관리자 행을 잠근 뒤 마지막 관리자를 `user`로 바꾸려 하면 `LAST_ADMIN`이다.
+    - 잘못된 역할은 `VALIDATION`, 없는 사용자는 `NOT_FOUND`이고, 같은 역할로 바꾸면 아무것도 하지 않는다.
+  - `admin_dismiss_report(p_report_id)`: `open` 신고만 `dismissed`로 바꾸고 `resolved_at`을 기록한다. 이미 처리된 신고면 `NOT_FOUND`다.
+- **`events_set_updated_at` 트리거 변경**: 숨김·해제가 `수정됨` 배지로 보이지 않도록 내용 컬럼(`title, description, location, starts_at, ends_at, capacity, rsvp_deadline, cover_image_path`)이 SET에 있을 때만 실행한다. 제목·커버를 바꾸면 여전히 갱신되는 것을 확인했다.
+- **앱 오류 코드**: `LAST_ADMIN`("마지막 관리자는 해제할 수 없습니다")과 `ALREADY_REPORTED`("이미 신고한 이벤트입니다", 신고 unique 위반을 앱에서 매핑, Task 009-1d)를 추가했다.
+- **검증**: DO 블록 하나에서 실행하고 롤백했다.
+  - 일반 사용자 B
+    - RPC 5종이 모두 `FORBIDDEN`이다.
+    - `role`·`hidden_at` 조회와 `select *`는 `42501`이다. 나열한 컬럼 조회는 정상이다.
+    - `get_event_hidden_states`로는 자기 숨김 이벤트만 1건 나온다.
+  - 관리자 A
+    - 사용자 목록 2건(`total_count` 2). `kakao` 검색은 1건(provider `kakao`)이고, `%` 검색은 0건이다.
+    - `limit` 0은 `VALIDATION`이다. 통계 6개 값이 직접 집계와 같다.
+    - 숨김: 사유가 없으면 `VALIDATION`, 없는 이벤트는 `NOT_FOUND`다. 숨기면 `updated_at`은 그대로이고 open 신고는 `resolved`가 된다. 해제하면 null로 돌아간다.
+    - 역할: 마지막 관리자 해제는 `LAST_ADMIN`, 잘못된 역할은 `VALIDATION`이다. B를 관리자로 올렸다가 다시 내리는 것은 정상이다.
+    - 신고 기각 후 다시 기각하면 `NOT_FOUND`다.
+  - `anon`: RPC 실행이 `42501`로 거부된다.
+- **`get_advisors`**
+  - security: 관리자 RPC 5종과 `get_event_hidden_states`가 `authenticated_security_definer_function_executable` 경고로 나온다. 로그인 사용자가 호출해야 하고 함수 안에서 `is_admin()`(또는 주최자 여부)을 확인하므로 **의도된 예외**다.
+  - performance: `unused_index`(INFO)만 나온다.
+
+**추가: `admin_list_events` (Task 010-a, 2026-10-27, 마이그레이션 `admin_list_events`)**
+
+- `admin_list_events(p_search, p_status = 'all', p_limit = 100, p_offset = 0)` → `event_id, hidden_at, hidden_reason, total_count`
+- 관리자 이벤트 목록이 전체 이벤트·응답을 읽어 2000개 기준 응답이 약 1MB였다. `hidden_at`은 `authenticated`가 조회·필터할 수 없어서 관리자 RPC로 검색(제목·주최자 이름, `%`·`_`는 글자 그대로)·상태(`all | visible | hidden`)·정렬(시작 최신순)·개수(1~100)를 처리한다. 앱은 고른 id의 본문과 응답만 `events`에서 읽는다.
+- 다른 관리자 RPC와 같이 `is_admin()`이 아니면 `FORBIDDEN`, 범위를 벗어나면 `VALIDATION`이다. 실행 권한은 `authenticated`에만 있다.
+- 검증(합성 이벤트 2000개, 롤백): 일반 사용자 `FORBIDDEN`, 전체 100행·`total_count` 2001·최신순, 숨김 11·공개 1990, 주최자·제목 검색, `%` 0건, offset, limit 101·잘못된 상태는 `VALIDATION`, 4.6ms.
 
 ### 9-6. 소셜 로그인 가입 시 프로필
 

@@ -9,7 +9,7 @@ import {
   ok,
   toActionErrorCode,
 } from "@/lib/action-result";
-import { EVENT_COVER_BUCKET, isOwnCoverPath } from "@/lib/storage/event-covers";
+import { isOwnCoverPath, removeCoverObject } from "@/lib/storage/event-covers";
 import { createClient } from "@/lib/supabase/server";
 import { eventInputSchema } from "@/lib/validations/event";
 import type { ActionResult } from "@/types/action";
@@ -56,14 +56,6 @@ function parseInput(
 // 다른 사용자 폴더의 객체를 이벤트에 연결하지 못하도록 경로 소유자를 다시 확인한다
 function isValidCoverPath(path: string | null | undefined, userId: string) {
   return typeof path !== "string" || isOwnCoverPath(path, userId);
-}
-
-// 이전 커버 객체 정리. 실패해도 이벤트 저장·삭제는 되돌리지 않는다 (고아 파일은 로그로 남김)
-async function removeCover(supabase: Supabase, path: string) {
-  const { error } = await supabase.storage
-    .from(EVENT_COVER_BUCKET)
-    .remove([path]);
-  if (error) console.error("커버 이미지 삭제 실패", path, error.message);
 }
 
 // 주최자 확인. 통과하면 기존 커버 경로를 돌려준다
@@ -150,7 +142,7 @@ export async function updateEvent(
     host.coverPath &&
     host.coverPath !== data.coverPath
   ) {
-    await removeCover(supabase, host.coverPath);
+    await removeCoverObject(supabase, host.coverPath);
   }
 
   revalidatePath("/events");
@@ -168,7 +160,7 @@ export async function deleteEvent(id: string): Promise<ActionResult<null>> {
   const { error } = await supabase.from("events").delete().eq("id", id);
   if (error) return failWith(toActionErrorCode(error.message));
 
-  if (host.coverPath) await removeCover(supabase, host.coverPath);
+  if (host.coverPath) await removeCoverObject(supabase, host.coverPath);
 
   revalidatePath("/events");
   return ok(null);

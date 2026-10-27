@@ -13,21 +13,19 @@
 | --------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
 | `app/`                                  | Routes (App Router). Existing: `/`, `/auth/*`, `/events/**`                                                      |
 | `app/events/**`                         | `/events`, `/events/new`, `/events/[id]`, `/events/[id]/edit`; Server Actions in `actions.ts`                    |
-| `app/admin/**`                          | Admin screens (dashboard, events, users, reports). Admin role only                                               |
+| `app/admin/**`                          | Admin screens (dashboard, events, users, reports). Gate = DB `is_admin()`; writes in `app/admin/actions.ts`      |
 | `components/ui/`                        | shadcn/ui primitives ONLY                                                                                        |
 | `components/`                           | Domain/shared components (kebab-case filenames)                                                                  |
 | `lib/supabase/{server,client,proxy}.ts` | Three Supabase clients (see Supabase Rules)                                                                      |
 | `lib/utils.ts`                          | `cn()`, `hasEnvVars`                                                                                             |
 | `lib/supabase/database.types.ts`        | Generated types (regenerate after every schema change). DO NOT edit by hand                                      |
-| `lib/queries/`                          | Server-only read layer (`events.ts`): maps DB rows to view models                                                |
+| `lib/queries/`                          | Server-only read layer (`events.ts`, `admin.ts`): maps DB rows / admin RPCs to view models                       |
 | `lib/storage/event-covers.ts`           | Cover image Storage path / owner check / public URL helpers                                                      |
 | `types/`                                | Domain types (`event`, `rsvp`, `admin`) and `ActionResult` (`action`)                                            |
 | `lib/validations/`                      | zod schemas, KST ↔ UTC (`kstLocalToIso`, `isoToKstLocal`)                                                        |
 | `lib/format.ts`, `lib/event-status.ts`  | KST display formatting; `getEventPhase(event, now)`, RSVP labels                                                 |
 | `lib/safe-next.ts`                      | `sanitizeNext()` — the ONLY way to validate `next` redirect values                                               |
 | `lib/auth/`                             | Auth constants (`SOCIAL_PROVIDERS`, `LOGIN_SOCIAL_PROVIDERS`, `isSocialProviderEnabled`, `AUTH_PROVIDER_LABELS`) |
-| `lib/mock/`                             | Admin-screen dummy data ONLY (event screens use real queries). Delete in Task 009-1                              |
-| `lib/mock/role.ts`                      | Dev-only role switch cookie (delete in Task 009-1)                                                               |
 | `proxy.ts` (root)                       | Calls `updateSession()`. Next.js 16: NEVER create `middleware.ts`                                                |
 | `docs/guides/`                          | Read the matching guide before the related work                                                                  |
 | `shrimp_data/`                          | Task manager data. DO NOT edit manually                                                                          |
@@ -80,7 +78,9 @@
 - Add shadcn components with `npx shadcn@latest add <name>` (or shadcn MCP). DO NOT hand-write files in `components/ui/`. Config: `components.json`.
 - Domain components live in `components/` (`EventCard`, `EventForm`, `EventCover`, `RsvpButtons`, `AttendeeList`, `CapacityBadge`, `ShareLinkButton`, `DeleteEventDialog`, `SocialLoginButtons`).
 - Read `docs/guides/component-patterns.md` and `docs/guides/styling-guide.md` before building components.
-- Event screens read via `lib/queries/` and write via Server Actions. DO NOT import `lib/mock/` outside the admin screens (`app/admin/**`, `auth-button`, `user-menu` role toggle) — those are replaced in Task 009-1.
+- All screens read via `lib/queries/` and write via Server Actions. There is no mock data layer (`lib/mock/` was deleted in Task 009-1); DO NOT reintroduce dummy data or simulated delays.
+- `profiles.role` and `events.hidden_*` are NOT selectable by `authenticated`. NEVER `select("*")` on `events`/`profiles`; list columns (`EVENT_COLUMNS`) and read hidden state via `getHiddenStates()`, admin status via `getIsAdmin()`.
+- Colors: use theme tokens only (`bg-primary`, `text-destructive`, `text-muted-foreground`, …). DO NOT use raw palette classes (`text-red-500`). Theme = tweakcn Clean Slate in `app/globals.css` (HSL, AA-adjusted); keep every text/background pair ≥ 4.5:1.
 
 ## Multi-file Coordination
 
@@ -98,7 +98,7 @@
 
 - Follow ROADMAP order (Task 001 → 010). Do one Task at a time.
 - API/business-logic tasks: test with Playwright MCP (E2E scenarios in a "## 테스트 체크리스트" section of the task).
-- Browser testing that needs login: the linked Supabase project has only the user's own accounts (see `CLAUDE.md`). DO NOT create accounts or try other credentials; ask the user to log in in the Playwright window. Admin screens: set the dev-only `mock-role=admin` cookie until Task 009-1.
+- Browser testing that needs login: the linked Supabase project has only the user's own accounts (see `CLAUDE.md`). DO NOT create accounts or try other credentials; ask the user to log in in the Playwright window. Admin screens: log in as the admin account (`lcm563@naver.com`). Non-admin checks: the user account (`lcm563@kakao.com`) or one rolled-back SQL call with `request.jwt.claims`/`role` set. After role-change tests, confirm the first admin is still admin. Audit script: `.playwright-mcp/audit-phase3.js` (set the event ids at the top first).
 - Completion gate after each task: `npm run check-all` AND `npm run build` must pass. Then stop and wait for user instruction.
 - Git: pre-commit runs lint-staged; pre-push runs `npm run typecheck`. DO NOT use `--no-verify`. Commit messages follow `.claude/commands/git/commit.md` (emoji + conventional). Commit only when asked.
 

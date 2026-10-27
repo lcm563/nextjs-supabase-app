@@ -2,9 +2,10 @@ import { AdminNav } from "@/components/admin/admin-nav";
 import { PageLoading } from "@/components/page-loading";
 import { SiteFooter } from "@/components/site-footer";
 import { SiteHeader } from "@/components/site-header";
-import { getMockRole } from "@/lib/mock/role";
+import { getIsAdmin } from "@/lib/queries/admin";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
+import { connection } from "next/server";
 import { Suspense } from "react";
 
 export const metadata: Metadata = {
@@ -12,7 +13,7 @@ export const metadata: Metadata = {
   robots: { index: false, follow: false },
 };
 
-// 관리자 영역 레이아웃: 정적 쉘 + 역할 판정은 Suspense 안에서 (쿠키 읽기)
+// 관리자 영역 레이아웃: 정적 쉘 + 역할 판정은 Suspense 안에서 (세션 쿠키 읽기)
 export default function AdminLayout({
   children,
 }: {
@@ -31,10 +32,11 @@ export default function AdminLayout({
   );
 }
 
-// 관리자가 아니면 관리자 영역의 존재를 드러내지 않도록 404
-// TODO(Task 009-1): getMockRole() → is_admin() RPC
+// 관리자가 아니면 관리자 영역의 존재를 드러내지 않도록 404 (판정은 DB의 is_admin())
 async function AdminGate({ children }: { children: React.ReactNode }) {
-  if ((await getMockRole()) !== "admin") notFound();
+  // Supabase 클라이언트가 세션 만료 판정에 Date.now()를 읽으므로 요청 시점 렌더링임을 먼저 알린다
+  await connection();
+  if (!(await getIsAdmin())) notFound();
 
   return (
     <div className="flex flex-col gap-6">

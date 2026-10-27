@@ -16,6 +16,7 @@ import { Separator } from "@/components/ui/separator";
 import { SocialLoginButtons } from "@/components/social-login-buttons";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { authErrorMessage } from "@/lib/auth/auth-error";
 import { withNext } from "@/lib/safe-next";
 import { useEffect, useState } from "react";
 
@@ -57,9 +58,7 @@ export function LoginForm({
       // 뒤로 가기로 로그인 화면에 돌아오지 않도록 replace
       router.replace(next);
     } catch (error: unknown) {
-      setError(
-        error instanceof Error ? error.message : "로그인 중 오류가 발생했습니다"
-      );
+      setError(authErrorMessage(error, "로그인 중 오류가 발생했습니다"));
     } finally {
       setIsLoading(false);
     }

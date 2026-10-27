@@ -1,5 +1,6 @@
 "use client";
 
+import { deleteEventAsAdmin, setEventHidden } from "@/app/admin/actions";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -38,6 +39,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
+import { HIDDEN_REASON_MAX } from "@/lib/validations/admin";
 import { EyeOff, MoreHorizontal, RotateCcw, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
@@ -53,13 +55,6 @@ export type AdminEventRow = {
   hidden: boolean;
   hidden_reason: string | null;
 };
-
-// 모의 처리 지연 (Task 009-1에서 제거)
-const MOCK_DELAY_MS = 300;
-// DB_SCHEMA.md 9-3: hidden_reason 200자 제한
-const HIDDEN_REASON_MAX = 200;
-
-const wait = () => new Promise((resolve) => setTimeout(resolve, MOCK_DELAY_MS));
 
 // 전체 이벤트 관리 표 (숨김·복구·강제 삭제)
 export function AdminEventTable({
@@ -95,19 +90,29 @@ export function AdminEventTable({
     const target = hideTarget;
     setHideTarget(null);
     setBusyId(target.id);
-    // TODO(Task 009-1): admin_set_event_hidden(target.id, true, trimmed) RPC
-    await wait();
-    updateRow(target.id, { hidden: true, hidden_reason: trimmed });
+    const result = await setEventHidden({
+      event_id: target.id,
+      hidden: true,
+      reason: trimmed,
+    });
     setBusyId(null);
+    if (!result.success) {
+      toast.error(result.error.message);
+      return;
+    }
+    updateRow(target.id, { hidden: true, hidden_reason: trimmed });
     toast.success(`‘${target.title}’을(를) 숨겼습니다`);
   };
 
   const restore = async (row: AdminEventRow) => {
     setBusyId(row.id);
-    // TODO(Task 009-1): admin_set_event_hidden(row.id, false, null) RPC
-    await wait();
-    updateRow(row.id, { hidden: false, hidden_reason: null });
+    const result = await setEventHidden({ event_id: row.id, hidden: false });
     setBusyId(null);
+    if (!result.success) {
+      toast.error(result.error.message);
+      return;
+    }
+    updateRow(row.id, { hidden: false, hidden_reason: null });
     toast.success(`‘${row.title}’을(를) 다시 공개했습니다`);
   };
 
@@ -116,10 +121,13 @@ export function AdminEventTable({
     const target = deleteTarget;
     setDeleteTarget(null);
     setBusyId(target.id);
-    // TODO(Task 009-1): 관리자 권한으로 events 행 delete (RLS에 is_admin() 허용 추가)
-    await wait();
-    setRows((prev) => prev.filter((row) => row.id !== target.id));
+    const result = await deleteEventAsAdmin(target.id);
     setBusyId(null);
+    if (!result.success) {
+      toast.error(result.error.message);
+      return;
+    }
+    setRows((prev) => prev.filter((row) => row.id !== target.id));
     toast.success(`‘${target.title}’을(를) 삭제했습니다`);
   };
 

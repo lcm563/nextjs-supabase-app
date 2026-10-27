@@ -2,12 +2,12 @@ import { AdminSearchForm } from "@/components/admin/admin-search-form";
 import { AdminUserTable } from "@/components/admin/admin-user-table";
 import { Skeleton } from "@/components/ui/skeleton";
 import { formatDateTime } from "@/lib/format";
-import { getMockAdminUsers } from "@/lib/mock";
+import { getAdminUsers } from "@/lib/queries/admin";
 import type { Metadata } from "next";
 import { connection } from "next/server";
 import { Suspense } from "react";
 
-// 사용자 관리 (데이터는 Task 009-1에서 admin_list_users RPC로 교체)
+// 사용자 관리 (admin_list_users RPC, 가입 최신순 최대 100명)
 
 export const metadata: Metadata = { title: "사용자 관리" };
 
@@ -36,20 +36,15 @@ async function AdminUsersContent({
   const params = await searchParams;
   const q = params.q?.trim() ?? "";
   await connection();
-  const now = new Date();
 
-  const totalAdmins = getMockAdminUsers(now).filter(
-    (user) => user.role === "admin"
-  ).length;
-  const rows = getMockAdminUsers(now, { q }).map(
-    ({ created_at, last_sign_in_at, ...user }) => ({
-      ...user,
-      created_at_label: formatDateTime(created_at),
-      last_sign_in_label: last_sign_in_at
-        ? formatDateTime(last_sign_in_at)
-        : null,
-    })
-  );
+  const { rows: users, total, totalAdmins } = await getAdminUsers({ q });
+  const rows = users.map(({ created_at, last_sign_in_at, ...user }) => ({
+    ...user,
+    created_at_label: formatDateTime(created_at),
+    last_sign_in_label: last_sign_in_at
+      ? formatDateTime(last_sign_in_at)
+      : null,
+  }));
 
   return (
     <div className="space-y-4">
@@ -60,7 +55,7 @@ async function AdminUsersContent({
       />
       <p className="text-sm text-muted-foreground" aria-live="polite">
         {q ? `‘${q}’ 검색 결과 ` : ""}
-        {rows.length}명
+        {total}명{total > rows.length ? ` 중 최근 ${rows.length}명 표시` : ""}
       </p>
       <AdminUserTable key={q} rows={rows} totalAdmins={totalAdmins} />
     </div>

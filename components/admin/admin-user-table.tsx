@@ -1,5 +1,6 @@
 "use client";
 
+import { setUserRole } from "@/app/admin/actions";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -35,8 +36,6 @@ export type AdminUserTableRow = Omit<
   last_sign_in_label: string | null;
 };
 
-// 모의 처리 지연 (Task 009-1에서 제거)
-const MOCK_DELAY_MS = 300;
 const LAST_ADMIN_NOTE_ID = "last-admin-note";
 
 // 사용자 관리 표 (역할 변경)
@@ -60,13 +59,17 @@ export function AdminUserTable({
     const nextRole: UserRole = user.role === "admin" ? "user" : "admin";
     setTarget(null);
     setBusyId(user.id);
-    // TODO(Task 009-1): admin_set_user_role(user.id, nextRole) RPC (마지막 관리자 해제는 DB에서도 거부)
-    await new Promise((resolve) => setTimeout(resolve, MOCK_DELAY_MS));
+    // 마지막 관리자 해제는 DB에서도 LAST_ADMIN으로 거부한다
+    const result = await setUserRole({ user_id: user.id, role: nextRole });
+    setBusyId(null);
+    if (!result.success) {
+      toast.error(result.error.message);
+      return;
+    }
     setRows((prev) =>
       prev.map((row) => (row.id === user.id ? { ...row, role: nextRole } : row))
     );
     setAdminCount((count) => count + (nextRole === "admin" ? 1 : -1));
-    setBusyId(null);
     toast.success(
       nextRole === "admin"
         ? `${user.display_name}님을 관리자로 지정했습니다`

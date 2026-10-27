@@ -62,8 +62,7 @@ async function EventDetailContent({
   const phase = getEventPhase(event, now);
   const isHost = event.host.id === userId;
   const edited = isEventEdited(event);
-  // TODO(Task 009-1): 숨김 컬럼 추가 전까지 hidden_at은 항상 null이라 배너가 렌더링되지 않는다.
-  // 숨김 이벤트 노출 범위는 RLS(주최자·is_admin())가 판정한다.
+  // 숨긴 이벤트는 RLS가 주최자·관리자에게만 보여주고, 숨김 정보도 이 둘에게만 채워진다
   const isHidden = event.hidden_at !== null;
 
   return (
@@ -72,7 +71,7 @@ async function EventDetailContent({
         src={event.cover_image_url}
         alt={`${event.title} 커버 이미지`}
         variant="hero"
-        priority
+        loadingMode="preload"
       />
       {isHidden && (
         <div

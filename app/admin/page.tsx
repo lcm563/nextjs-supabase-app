@@ -3,31 +3,20 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { AUTH_PROVIDER_LABELS } from "@/lib/auth/providers";
 import { formatDateTime } from "@/lib/format";
-import {
-  getMockAdminStats,
-  getMockAdminUsers,
-  getMockReports,
-} from "@/lib/mock";
+import { getAdminStats, getRecentUsers, getReports } from "@/lib/queries/admin";
 import { REPORT_REASON_LABELS } from "@/lib/validations/report";
-import type { AuthProvider } from "@/types/admin";
+import { AUTH_PROVIDERS } from "@/types/admin";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { connection } from "next/server";
 import { Suspense } from "react";
 
-// 관리자 대시보드 (데이터는 Task 009-1에서 admin_stats RPC로 교체)
+// 관리자 대시보드
 
 // layout의 title.template은 같은 세그먼트의 page에는 적용되지 않아 전체 제목을 직접 지정
 export const metadata: Metadata = {
   title: { absolute: "대시보드 | 관리자 | 모임 이벤트" },
 };
-
-const PROVIDER_ORDER: AuthProvider[] = [
-  "email",
-  "google",
-  "kakao",
-  "custom:naver",
-];
 
 export default function AdminDashboardPage() {
   return (
@@ -42,10 +31,11 @@ export default function AdminDashboardPage() {
 
 async function DashboardContent() {
   await connection();
-  const now = new Date();
-  const stats = getMockAdminStats(now);
-  const openReports = getMockReports(now, "open").slice(0, 3);
-  const recentUsers = getMockAdminUsers(now).slice(0, 3);
+  const [stats, openReports, recentUsers] = await Promise.all([
+    getAdminStats(),
+    getReports("open").then((reports) => reports.slice(0, 3)),
+    getRecentUsers(3),
+  ]);
 
   const metrics: {
     label: string;
@@ -113,7 +103,7 @@ async function DashboardContent() {
         </CardHeader>
         <CardContent>
           <ul className="space-y-3">
-            {PROVIDER_ORDER.map((provider) => {
+            {AUTH_PROVIDERS.map((provider) => {
               const count = stats.users_by_provider[provider];
               const percent =
                 stats.users_total === 0

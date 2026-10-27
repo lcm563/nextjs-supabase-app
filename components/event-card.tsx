@@ -12,10 +12,12 @@ type EventCardProps = {
   event: EventListItem;
   /** 종료 여부. 현재 시각 판단은 호출하는 서버 페이지에서 한다 */
   isPast: boolean;
+  /** 첫 화면에 보이는 카드면 true: 커버를 지연 로딩하지 않는다 (LCP) */
+  aboveFold?: boolean;
 };
 
 // 이벤트 목록 카드. 카드 전체가 상세 페이지 링크
-export function EventCard({ event, isPast }: EventCardProps) {
+export function EventCard({ event, isPast, aboveFold }: EventCardProps) {
   return (
     <Link
       href={`/events/${event.id}`}
@@ -26,7 +28,12 @@ export function EventCard({ event, isPast }: EventCardProps) {
       )}
     >
       {/* 제목이 바로 아래 있으므로 썸네일은 장식용 */}
-      <EventCover src={event.cover_image_url} alt="" variant="card" />
+      <EventCover
+        src={event.cover_image_url}
+        alt=""
+        variant="card"
+        loadingMode={aboveFold ? "eager" : undefined}
+      />
       <div className="p-4">
         <div className="flex flex-wrap items-center gap-1.5">
           {event.hidden_at && <Badge variant="destructive">숨김</Badge>}

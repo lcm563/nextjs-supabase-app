@@ -3,12 +3,13 @@ import { AdminFilterTabs } from "@/components/admin/admin-filter-tabs";
 import { AdminSearchForm } from "@/components/admin/admin-search-form";
 import { Skeleton } from "@/components/ui/skeleton";
 import { formatDateTime } from "@/lib/format";
-import { getMockAdminEvents, type AdminEventStatusFilter } from "@/lib/mock";
+import { getAdminEvents } from "@/lib/queries/admin";
+import type { AdminEventStatusFilter } from "@/types/admin";
 import type { Metadata } from "next";
 import { connection } from "next/server";
 import { Suspense } from "react";
 
-// 전체 이벤트 관리 (데이터는 Task 009-1에서 실제 쿼리로 교체)
+// 전체 이벤트 관리 (숨김 이벤트 포함, 시작 최신순 최대 100건 — 그 이전은 검색으로 찾는다)
 
 export const metadata: Metadata = { title: "이벤트 관리" };
 
@@ -56,9 +57,9 @@ async function AdminEventsContent({
   const q = params.q?.trim() ?? "";
   const status = toStatus(params.status);
   await connection();
-  const now = new Date();
 
-  const rows = getMockAdminEvents(now, { q, status }).map((event) => ({
+  const { rows: events, total } = await getAdminEvents({ q, status });
+  const rows = events.map((event) => ({
     id: event.id,
     title: event.title,
     host_name: event.host.display_name,
@@ -86,7 +87,7 @@ async function AdminEventsContent({
       />
       <p className="text-sm text-muted-foreground" aria-live="polite">
         {q ? `‘${q}’ 검색 결과 ` : ""}
-        {rows.length}건
+        {total}건{total > rows.length ? ` 중 최근 ${rows.length}건 표시` : ""}
       </p>
       {/* 필터·검색이 바뀌면 로컬 처리 상태를 버리고 새 목록으로 */}
       <AdminEventTable key={`${q}|${status}`} rows={rows} />

@@ -17,7 +17,7 @@ type SocialLoginButtonsProps = {
 };
 
 // 아직 켜지 않은 provider의 '준비 중' 안내 지연
-const MOCK_DELAY_MS = 600;
+const NOT_READY_NOTICE_DELAY_MS = 600;
 
 // 브랜드 색은 각 사 로그인 버튼 가이드를 따르므로 디자인 토큰 예외로 둔다.
 // 대비(글자/배경): Google 라이트 #1F1F1F/흰색, 다크 #E3E3E3/#131314, 카카오 85% 검정/#FEE500, 네이버 #1F1F1F/흰색 — 모두 4.5:1 이상
@@ -69,7 +69,7 @@ export function SocialLoginButtons({
     timerRef.current = setTimeout(() => {
       toast.info(`${label} 로그인은 준비 중입니다`);
       setPendingId(null);
-    }, MOCK_DELAY_MS);
+    }, NOT_READY_NOTICE_DELAY_MS);
   };
 
   return (

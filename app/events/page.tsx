@@ -98,8 +98,13 @@ async function EventListContent({
         <EmptyState tab={activeTab} />
       ) : (
         <>
-          <EventSection title="다가오는 이벤트" items={upcoming} />
-          <EventSection title="지난 이벤트" items={past} isPast />
+          <EventSection title="다가오는 이벤트" items={upcoming} isFirst />
+          <EventSection
+            title="지난 이벤트"
+            items={past}
+            isPast
+            isFirst={upcoming.length === 0}
+          />
         </>
       )}
     </div>
@@ -120,14 +125,20 @@ function splitByPhase(items: EventListItem[], now: Date) {
   return { upcoming, past };
 }
 
+// 첫 화면에 보이는 카드 수: 데스크톱 2열의 첫 줄 (모바일은 첫 카드)
+const ABOVE_FOLD_CARDS = 2;
+
 function EventSection({
   title,
   items,
   isPast = false,
+  isFirst = false,
 }: {
   title: string;
   items: EventListItem[];
   isPast?: boolean;
+  /** 페이지에서 처음 보이는 섹션이면 앞쪽 카드 커버를 지연 로딩하지 않는다 */
+  isFirst?: boolean;
 }) {
   if (items.length === 0) return null;
 
@@ -135,9 +146,13 @@ function EventSection({
     <section className="space-y-3">
       <h2 className="text-lg font-semibold">{title}</h2>
       <ul className="grid gap-3 sm:grid-cols-2">
-        {items.map((item) => (
+        {items.map((item, index) => (
           <li key={item.id}>
-            <EventCard event={item} isPast={isPast} />
+            <EventCard
+              event={item}
+              isPast={isPast}
+              aboveFold={isFirst && index < ABOVE_FOLD_CARDS}
+            />
           </li>
         ))}
       </ul>

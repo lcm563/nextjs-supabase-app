@@ -2,13 +2,13 @@ import { AdminFilterTabs } from "@/components/admin/admin-filter-tabs";
 import { ReportList } from "@/components/admin/report-list";
 import { Skeleton } from "@/components/ui/skeleton";
 import { formatDateTime } from "@/lib/format";
-import { getMockReports } from "@/lib/mock";
+import { getReports } from "@/lib/queries/admin";
 import type { ReportStatus } from "@/types/admin";
 import type { Metadata } from "next";
 import { connection } from "next/server";
 import { Suspense } from "react";
 
-// 신고 관리 (데이터는 Task 009-1에서 event_reports 조회로 교체)
+// 신고 관리
 
 export const metadata: Metadata = { title: "신고 관리" };
 
@@ -47,9 +47,9 @@ async function AdminReportsContent({
   const { status: rawStatus } = await searchParams;
   const status = toStatus(rawStatus);
   await connection();
-  const now = new Date();
 
-  const all = getMockReports(now);
+  // 탭별 개수를 함께 보여주므로 전체를 읽어 상태별로 나눈다
+  const all = await getReports();
   const items = all
     .filter((report) => report.status === status)
     .map(({ created_at, ...report }) => ({
