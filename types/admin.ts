@@ -3,8 +3,26 @@
 
 export type UserRole = "user" | "admin";
 
+export function isUserRole(value: string): value is UserRole {
+  return value === "user" || value === "admin";
+}
+
 // Supabase Auth provider 값 (네이버는 커스텀 OIDC provider라 "custom:" 접두사)
-export type AuthProvider = "email" | "google" | "kakao" | "custom:naver";
+export const AUTH_PROVIDERS = [
+  "email",
+  "google",
+  "kakao",
+  "custom:naver",
+] as const;
+
+export type AuthProvider = (typeof AUTH_PROVIDERS)[number];
+
+export function isAuthProvider(value: string): value is AuthProvider {
+  return (AUTH_PROVIDERS as readonly string[]).includes(value);
+}
+
+// 관리자 이벤트 목록 공개 상태 필터
+export type AdminEventStatusFilter = "all" | "visible" | "hidden";
 
 // 사용자 관리 목록 행
 export type AdminUserRow = {
@@ -29,7 +47,13 @@ export type AdminStats = {
   users_by_provider: Record<AuthProvider, number>;
 };
 
-export type ReportStatus = "open" | "resolved" | "dismissed";
+export const REPORT_STATUSES = ["open", "resolved", "dismissed"] as const;
+
+export type ReportStatus = (typeof REPORT_STATUSES)[number];
+
+export function isReportStatus(value: string): value is ReportStatus {
+  return (REPORT_STATUSES as readonly string[]).includes(value);
+}
 
 export const REPORT_REASONS = [
   "spam",
@@ -39,6 +63,10 @@ export const REPORT_REASONS = [
 ] as const;
 
 export type ReportReason = (typeof REPORT_REASONS)[number];
+
+export function isReportReason(value: string): value is ReportReason {
+  return (REPORT_REASONS as readonly string[]).includes(value);
+}
 
 // 이벤트 신고 (관리자 신고 목록 표시용)
 export type EventReport = {

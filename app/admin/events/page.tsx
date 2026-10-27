@@ -3,12 +3,13 @@ import { AdminFilterTabs } from "@/components/admin/admin-filter-tabs";
 import { AdminSearchForm } from "@/components/admin/admin-search-form";
 import { Skeleton } from "@/components/ui/skeleton";
 import { formatDateTime } from "@/lib/format";
-import { getMockAdminEvents, type AdminEventStatusFilter } from "@/lib/mock";
+import { getAdminEvents } from "@/lib/queries/admin";
+import type { AdminEventStatusFilter } from "@/types/admin";
 import type { Metadata } from "next";
 import { connection } from "next/server";
 import { Suspense } from "react";
 
-// 전체 이벤트 관리 (데이터는 Task 009-1에서 실제 쿼리로 교체)
+// 전체 이벤트 관리 (숨김 이벤트 포함)
 
 export const metadata: Metadata = { title: "이벤트 관리" };
 
@@ -56,9 +57,8 @@ async function AdminEventsContent({
   const q = params.q?.trim() ?? "";
   const status = toStatus(params.status);
   await connection();
-  const now = new Date();
 
-  const rows = getMockAdminEvents(now, { q, status }).map((event) => ({
+  const rows = (await getAdminEvents({ q, status })).map((event) => ({
     id: event.id,
     title: event.title,
     host_name: event.host.display_name,
