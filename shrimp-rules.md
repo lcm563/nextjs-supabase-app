@@ -76,7 +76,8 @@
 ## UI Rules
 
 - Add shadcn components with `npx shadcn@latest add <name>` (or shadcn MCP). DO NOT hand-write files in `components/ui/`. Config: `components.json`.
-- Domain components live in `components/` (`EventCard`, `EventForm`, `EventCover`, `RsvpButtons`, `AttendeeList`, `CapacityBadge`, `ShareLinkButton`, `DeleteEventDialog`, `SocialLoginButtons`).
+- Domain components live in `components/` (`EventCard`, `EventForm`, `EventCover`, `RsvpButtons`, `AttendeeList`, `CapacityBadge`, `ShareLinkButton`, `DeleteEventDialog`, `SocialLoginButtons`, landing: `LandingPreview`, `LandingActions`).
+- Landing (`/`): keep it Partial Prerender. Only login-dependent parts (`components/landing-actions.tsx`) read the session, each inside its own `<Suspense>` after `await connection()`. Never show sign-up/login CTAs to a logged-in user. Landing copy must match real behavior (participants must log in to respond); structure is in `docs/PRD.md` §6 "랜딩 구성".
 - Read `docs/guides/component-patterns.md` and `docs/guides/styling-guide.md` before building components.
 - All screens read via `lib/queries/` and write via Server Actions. There is no mock data layer (`lib/mock/` was deleted in Task 009-1); DO NOT reintroduce dummy data or simulated delays.
 - `profiles.role` and `events.hidden_*` are NOT selectable by `authenticated`. NEVER `select("*")` on `events`/`profiles`; list columns (`EVENT_COLUMNS`) and read hidden state via `getHiddenStates()`, admin status via `getIsAdmin()`.

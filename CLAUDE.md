@@ -97,6 +97,7 @@ npm run build       # 빌드 성공 확인
 - `lib/queries/`: 서버 전용 조회 계층(`events.ts`: 내 이벤트 목록·상세, 응답 집계, 커버 공개 URL, 숨김 상태 / `admin.ts`: 관리자 판정·통계·사용자·이벤트·신고). 접근 범위는 RLS·RPC가 판정
 - `lib/storage/event-covers.ts`: 커버 이미지 Storage 경로·소유자 검사·공개 URL 헬퍼 (버킷 `event-covers`, 경로 `{uid}/{uuid}.{ext}`)
 - Server Action: `app/events/actions.ts`(이벤트 생성·수정·삭제, 커버 경로 저장·이전 파일 정리), `app/events/[id]/actions.ts`(참석 응답 → RPC `respond_to_event`, 신고 `reportEvent`), `app/admin/actions.ts`(숨김·복구, 강제 삭제, 역할 변경, 신고 기각 → 관리자 RPC)
+- 랜딩(`app/page.tsx`): 정적 쉘(소개·세 단계·역할별 기능·FAQ)은 프리렌더하고, 로그인 여부로 달라지는 부분(히어로 버튼·다가오는 내 이벤트 띠·마지막 CTA, `components/landing-actions.tsx`)만 각각 `<Suspense>` 안에서 그린다. 이벤트 상세 미리보기(`components/landing-preview.tsx`)는 고정 예시 데이터. 구성은 `docs/PRD.md` 6장 "랜딩 구성"
 - `app/admin/`: 관리자 화면 (대시보드·이벤트·사용자·신고). 레이아웃의 `AdminGate`가 DB의 `is_admin()`으로 판정해 관리자가 아니면 404
 - `lib/auth/`: 소셜 provider 상수·활성화 판정·로그인 화면 노출 목록(`providers.ts`, 네이버는 MVP 이후 과제라 숨김), 인증 Route Handler 공통 오류 리다이렉트(`error-redirect.ts`)
 - **공개 경로**: `/`, `/login*`, `/auth/*` (login, sign-up, forgot-password, 소셜 로그인 콜백 `/auth/callback` 등) (조건은 `lib/supabase/proxy.ts` 참고)
@@ -215,4 +216,5 @@ import { Button } from "@/components/ui/button";
 - 연결된 Supabase 프로젝트의 계정은 사용자 본인 계정 두 개뿐이다: `lcm563@naver.com`(표시 이름 lcm563, **관리자**)과 `lcm563@kakao.com`(Bomdong, 일반 사용자). 별도 테스트 계정은 없으며, 비밀번호는 문서에 적지 않는다.
 - 로그인이 필요하면 임의 계정으로 시도하거나 계정을 새로 만들지 말고, 사용자에게 Playwright 브라우저에서 직접 로그인해 달라고 요청한다.
 - 관리자 화면 확인: 관리자 계정(`lcm563@naver.com`)으로 로그인해 확인한다. 일반 사용자 시점은 일반 계정으로 로그인하거나, SQL 한 번의 호출 안에서 `request.jwt.claims`·`role`을 바꿔 확인하고 롤백한다. 역할을 바꾸는 테스트 뒤에는 첫 관리자 역할이 유지되는지 확인한다.
+- 랜딩 점검 스크립트: `.playwright-mcp/audit-landing.js`(git 제외). 비로그인은 빈 컨텍스트, 로그인은 배포 사이트 세션 쿠키를 복사한 별도 컨텍스트로 360·768·1280 × 라이트·다크를 확인한다(로그인 상태가 필요하면 배포 사이트에 먼저 로그인해 둔다)
 - 접근성·반응형 점검 스크립트: `.playwright-mcp/audit-phase3.js`(git 제외). 상단의 이벤트 id를 SQL로 만든 테스트 이벤트로 바꾼 뒤 관리자 세션에서 `browser_run_code_unsafe`의 `filename`으로 실행한다.
