@@ -16,7 +16,12 @@ import { Separator } from "@/components/ui/separator";
 import { SocialLoginButtons } from "@/components/social-login-buttons";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { authErrorMessage } from "@/lib/auth/auth-error";
 import { emailConfirmUrl, withNext } from "@/lib/safe-next";
+import {
+  PASSWORD_MIN_LENGTH,
+  passwordSchema,
+} from "@/lib/validations/password";
 import {
   DISPLAY_NAME_MAX_LENGTH,
   displayNameSchema,
@@ -61,6 +66,13 @@ export function SignUpForm({
       return;
     }
 
+    const parsedPassword = passwordSchema.safeParse(password);
+    if (!parsedPassword.success) {
+      setError(parsedPassword.error.issues[0].message);
+      setIsLoading(false);
+      return;
+    }
+
     if (password !== repeatPassword) {
       setError("비밀번호가 일치하지 않습니다");
       setIsLoading(false);
@@ -85,9 +97,7 @@ export function SignUpForm({
       setRepeatPassword("");
       router.push("/auth/sign-up-success");
     } catch (error: unknown) {
-      setError(
-        error instanceof Error ? error.message : "가입 중 오류가 발생했습니다"
-      );
+      setError(authErrorMessage(error, "가입 중 오류가 발생했습니다"));
     } finally {
       setIsLoading(false);
     }
@@ -134,9 +144,16 @@ export function SignUpForm({
                   id="sign-up-password"
                   type="password"
                   required
+                  aria-describedby="sign-up-password-hint"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                 />
+                <p
+                  id="sign-up-password-hint"
+                  className="text-xs text-muted-foreground"
+                >
+                  {PASSWORD_MIN_LENGTH}자 이상
+                </p>
               </div>
               <div className="grid gap-2">
                 <div className="flex items-center">

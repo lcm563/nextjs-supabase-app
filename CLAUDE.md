@@ -86,6 +86,7 @@ npm run build       # 빌드 성공 확인
 - **리다이렉트 경로 검증**: 로그인·이메일 확인 후 이동하는 `next` 값은 반드시 `lib/safe-next.ts`의 `sanitizeNext()`로 검증 (오픈 리다이렉트 방지)
 - **원래 화면 복귀**: proxy가 비로그인 접근을 `/auth/login?next=<경로+쿼리>`로 보내고, 로그인·가입 페이지가 `next`를 서버에서 검증해 폼에 넘긴다. 인증 화면 사이 링크는 `withNext()`로 `next`를 유지
 - **이메일 링크**(가입 확인·비밀번호 재설정): `emailRedirectTo`/`redirectTo`는 `/auth/confirm?next=...`. `/auth/confirm`이 기본 템플릿의 `code`(현재 사용, PKCE라 요청한 브라우저에서만 세션 생성)와 `token_hash`(커스텀 SMTP 설정 후 전환 예정, Task 010)를 모두 처리한다. 다른 기기에서 가입 확인 링크를 열면 인증은 끝난 상태이므로 `/auth/login?notice=email-confirmed&next=...`로 보낸다. 돌아올 주소는 `emailConfirmUrl()`로 만든다(항상 `?next=` 포함)
+- **비밀번호 규칙**: 최소 8자(`lib/validations/password.ts`의 `PASSWORD_MIN_LENGTH`)는 Supabase Dashboard > Authentication > Email의 최소 길이와 **같아야 한다**(바꿀 때 둘 다). 유출 비밀번호 검사는 Pro 플랜 기능이라 Free 플랜에서는 쓰지 않는다. 인증 폼의 Supabase 오류는 원문(영어) 대신 `lib/auth/auth-error.ts`의 `authErrorMessage()`로 한국어 안내를 보여준다
 - **공유 링크 미리보기**: `/events/[id]`는 로그인이 필요하므로 카카오톡 등 미리보기는 루트 기본 메타데이터 카드로 표시됨 (PRD 8장)
 
 ### 주요 디렉터리

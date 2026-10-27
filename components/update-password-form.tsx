@@ -12,6 +12,11 @@ import {
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { authErrorMessage } from "@/lib/auth/auth-error";
+import {
+  PASSWORD_MIN_LENGTH,
+  passwordSchema,
+} from "@/lib/validations/password";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
@@ -27,21 +32,27 @@ export function UpdatePasswordForm({
   // 숨겨진 화면(Activity)에 새 비밀번호가 남지 않도록 화면을 떠날 때 지운다
   useEffect(() => () => setPassword(""), []);
 
-  const handleForgotPassword = async (
+  const handleUpdatePassword = async (
     e: React.SubmitEvent<HTMLFormElement>
   ) => {
     e.preventDefault();
-    const supabase = createClient();
-    setIsLoading(true);
     setError(null);
 
+    const parsed = passwordSchema.safeParse(password);
+    if (!parsed.success) {
+      setError(parsed.error.issues[0].message);
+      return;
+    }
+
+    const supabase = createClient();
+    setIsLoading(true);
     try {
       const { error } = await supabase.auth.updateUser({ password });
       if (error) throw error;
       setPassword("");
       router.push("/events");
     } catch (error: unknown) {
-      setError(error instanceof Error ? error.message : "An error occurred");
+      setError(authErrorMessage(error, "비밀번호를 바꾸지 못했습니다"));
     } finally {
       setIsLoading(false);
     }
@@ -51,28 +62,35 @@ export function UpdatePasswordForm({
     <div className={cn("flex flex-col gap-6", className)} {...props}>
       <Card>
         <CardHeader>
-          <CardTitle className="text-2xl">Reset Your Password</CardTitle>
+          <CardTitle className="text-2xl">새 비밀번호 설정</CardTitle>
           <CardDescription>
-            Please enter your new password below.
+            앞으로 로그인할 비밀번호를 입력해주세요
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <form onSubmit={handleForgotPassword}>
+          <form onSubmit={handleUpdatePassword}>
             <div className="flex flex-col gap-6">
               <div className="grid gap-2">
-                <Label htmlFor="update-password">New password</Label>
+                <Label htmlFor="update-password">새 비밀번호</Label>
                 <Input
                   id="update-password"
                   type="password"
-                  placeholder="New password"
+                  autoComplete="new-password"
                   required
+                  aria-describedby="update-password-hint"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                 />
+                <p
+                  id="update-password-hint"
+                  className="text-xs text-muted-foreground"
+                >
+                  {PASSWORD_MIN_LENGTH}자 이상
+                </p>
               </div>
               {error && <p className="text-sm text-destructive">{error}</p>}
               <Button type="submit" className="w-full" disabled={isLoading}>
-                {isLoading ? "Saving..." : "Save new password"}
+                {isLoading ? "저장 중…" : "새 비밀번호 저장"}
               </Button>
             </div>
           </form>
