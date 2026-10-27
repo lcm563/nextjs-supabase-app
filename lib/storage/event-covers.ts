@@ -25,6 +25,18 @@ export function isOwnCoverPath(path: string, userId: string): boolean {
   return COVER_PATH_PATTERN.exec(path)?.[1] === userId;
 }
 
+// 커버 객체 정리. 실패해도 이벤트 저장·삭제는 되돌리지 않는다 (고아 파일은 로그로 남김)
+// 삭제 범위는 Storage 정책이 판정한다: 본인 폴더, 관리자는 전체 (DB_SCHEMA.md 9-1, 9-2~9-4 적용 결과)
+export async function removeCoverObject(
+  supabase: SupabaseClient<Database>,
+  path: string
+): Promise<void> {
+  const { error } = await supabase.storage
+    .from(EVENT_COVER_BUCKET)
+    .remove([path]);
+  if (error) console.error("커버 이미지 삭제 실패", path, error.message);
+}
+
 export function getCoverPublicUrl(
   supabase: SupabaseClient<Database>,
   path: string | null

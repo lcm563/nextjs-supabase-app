@@ -1,5 +1,6 @@
 "use client";
 
+import { dismissReport, setEventHidden } from "@/app/admin/actions";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -13,9 +14,6 @@ export type ReportListItem = Omit<EventReport, "created_at"> & {
   /** 서버에서 formatDateTime으로 만든 표시 문자열 */
   created_at_label: string;
 };
-
-// 모의 처리 지연 (Task 009-1에서 제거)
-const MOCK_DELAY_MS = 300;
 
 const STATUS_LABELS: Record<ReportStatus, string> = {
   open: "처리 대기",
@@ -37,13 +35,35 @@ export function ReportList({
     status: Exclude<ReportStatus, "open">
   ) => {
     setBusyId(report.id);
-    // TODO(Task 009-1): resolved는 admin_set_event_hidden RPC(이벤트 숨김 + 신고 resolved),
-    // dismissed는 event_reports update (status·resolved_at)
-    await new Promise((resolve) => setTimeout(resolve, MOCK_DELAY_MS));
-    setItems((prev) =>
-      prev.map((item) => (item.id === report.id ? { ...item, status } : item))
-    );
+    // 숨김 처리: 신고 사유를 숨김 사유로 쓴다. DB가 이 이벤트의 처리 대기 신고를 모두 resolved로 바꾼다
+    const result =
+      status === "resolved"
+        ? await setEventHidden({
+            event_id: report.event_id,
+            hidden: true,
+            reason: `신고 처리: ${REPORT_REASON_LABELS[report.reason]}`,
+          })
+        : await dismissReport(report.id);
     setBusyId(null);
+    if (!result.success) {
+      // 기각 대상이 없으면 다른 관리자가 먼저 처리한 경우다
+      toast.error(
+        status === "dismissed" && result.error.code === "NOT_FOUND"
+          ? "이미 처리된 신고입니다"
+          : result.error.message
+      );
+      return;
+    }
+    setItems((prev) =>
+      prev.map((item) =>
+        item.id === report.id ||
+        (status === "resolved" &&
+          item.event_id === report.event_id &&
+          item.status === "open")
+          ? { ...item, status }
+          : item
+      )
+    );
     toast.success(
       status === "resolved"
         ? `‘${report.event_title}’을(를) 숨기고 신고를 처리했습니다`

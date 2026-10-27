@@ -1,5 +1,6 @@
 "use client";
 
+import { reportEvent } from "@/app/events/[id]/actions";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -45,9 +46,6 @@ type ReportFormValues = z.input<typeof reportInputSchema>;
 // 사유는 선택 전이면 비워 둔다 (미선택 제출 시 검증 오류)
 const DEFAULT_VALUES: DefaultValues<ReportFormValues> = { detail: "" };
 
-// 모의 접수 지연 (Task 009-1에서 제거)
-const MOCK_DELAY_MS = 400;
-
 // 이벤트 신고 대화상자 (주최자가 아닌 사용자에게만 표시)
 export function ReportEventDialog({
   eventId,
@@ -66,11 +64,21 @@ export function ReportEventDialog({
   const detail = useWatch({ control, name: "detail" });
   const { isSubmitting } = form.formState;
 
-  const onSubmit = async (values: ReportInput) => {
-    // TODO(Task 009-1): event_reports insert (eventId, values.reason, values.detail)
-    void eventId;
-    void values;
-    await new Promise((resolve) => setTimeout(resolve, MOCK_DELAY_MS));
+  // 검증 통과 후 변환 전 원본 값(빈 상세 = "")을 보낸다. 서버가 같은 스키마로 다시 검증·변환한다
+  const onSubmit = async () => {
+    const result = await reportEvent({
+      event_id: eventId,
+      ...form.getValues(),
+    });
+    if (!result.success) {
+      toast.error(result.error.message);
+      // 이미 신고했으면 다시 제출해도 같은 결과이므로 닫는다
+      if (result.error.code === "ALREADY_REPORTED") {
+        setOpen(false);
+        form.reset(DEFAULT_VALUES);
+      }
+      return;
+    }
 
     toast.success("신고가 접수되었습니다. 관리자가 검토합니다");
     setOpen(false);

@@ -1,8 +1,10 @@
 "use server";
 
-// 참석 응답 Server Action. 정원 판정·대기 전환·승격은 DB 함수 respond_to_event가 한 트랜잭션에서 처리한다.
+// 이벤트 상세 Server Action
+// 참석 응답: 정원 판정·대기 전환·승격은 DB 함수 respond_to_event가 한 트랜잭션에서 처리한다.
 import { failWith, ok, toActionErrorCode } from "@/lib/action-result";
 import { createClient } from "@/lib/supabase/server";
+import { reportInputSchema } from "@/lib/validations/report";
 import { rsvpInputSchema } from "@/lib/validations/rsvp";
 import type { ActionResult } from "@/types/action";
 import { isRsvpStatus, type RsvpStatus } from "@/types/rsvp";
@@ -29,4 +31,32 @@ export async function respondToEvent(
   revalidatePath(`/events/${event_id}`);
   revalidatePath("/events");
   return ok({ status: data.status });
+}
+
+const reportEventInputSchema = reportInputSchema.extend({ event_id: z.uuid() });
+
+// 이벤트 신고. 신고자는 세션 사용자로 정하고, 같은 이벤트 재신고는 unique 제약으로 막는다 (DB_SCHEMA.md 9-4)
+export async function reportEvent(input: unknown): Promise<ActionResult<null>> {
+  const parsed = reportEventInputSchema.safeParse(input);
+  if (!parsed.success) {
+    return failWith("VALIDATION", z.flattenError(parsed.error).fieldErrors);
+  }
+  const { event_id, reason, detail } = parsed.data;
+
+  const supabase = await createClient();
+  const { data: claims } = await supabase.auth.getClaims();
+  const userId = claims?.claims.sub;
+  if (!userId) return failWith("UNAUTHENTICATED");
+
+  const { error } = await supabase
+    .from("event_reports")
+    .insert({ event_id, reporter_id: userId, reason, detail });
+  if (error) {
+    if (error.code === "23505") return failWith("ALREADY_REPORTED");
+    if (error.code === "23503") return failWith("NOT_FOUND");
+    return failWith("INTERNAL");
+  }
+
+  revalidatePath("/admin", "layout");
+  return ok(null);
 }
