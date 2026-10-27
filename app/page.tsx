@@ -1,6 +1,9 @@
+import {
+  LandingActions,
+  LandingActionsSkeleton,
+} from "@/components/landing-actions";
 import { SiteFooter } from "@/components/site-footer";
 import { SiteHeader } from "@/components/site-header";
-import { Button } from "@/components/ui/button";
 import {
   Card,
   CardDescription,
@@ -8,7 +11,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Link2, ListChecks, Users } from "lucide-react";
-import Link from "next/link";
+import { Suspense } from "react";
 
 const FEATURES = [
   {
@@ -44,14 +47,9 @@ export default function Home() {
             링크 하나로 공지하고, 클릭 한 번으로 참석 현황이 정리됩니다.
             수영·헬스·러닝 모임 총무를 위한 가장 간단한 방법.
           </p>
-          <div className="flex w-full flex-col gap-3 sm:w-auto sm:flex-row">
-            <Button asChild size="lg">
-              <Link href="/auth/sign-up">무료로 시작하기</Link>
-            </Button>
-            <Button asChild size="lg" variant="outline">
-              <Link href="/events">내 이벤트 보기</Link>
-            </Button>
-          </div>
+          <Suspense fallback={<LandingActionsSkeleton />}>
+            <LandingActions />
+          </Suspense>
         </section>
 
         <section className="grid gap-4 sm:grid-cols-3">
