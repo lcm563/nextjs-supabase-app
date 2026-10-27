@@ -223,9 +223,15 @@
   - ✅ 76조합 대비 점검 0건 (폰트 Geist·그림자는 유지)
 
 - **Task 010: 성능 최적화 및 배포**
-  - Server Component 중심 렌더링 점검, 필요한 곳에 Cache Components(`use cache`) 적용
-  - 인덱스 추가(`rsvps(event_id)`, `events(host_id, starts_at)`) 및 `get_advisors` 재점검
-  - `npm run check-all`, `npm run build` 통과 확인
+  - ✅ Server Component 중심 렌더링 점검 (Task 010-a) — 측정 근거가 있는 항목만 최적화
+    - 빌드: 사용자 화면 전부 Partial Prerender(◐, 정적 쉘 + Suspense 안에서 요청 시점 데이터), OG 이미지만 정적(○), 인증 콜백·확인 Route Handler만 동적(ƒ)
+    - `use cache` 미적용: 목록·상세·관리자는 로그인 사용자별 데이터이고 RLS·응답 상태에 따라 결과가 달라 공유 캐시 대상이 아니다. 랜딩·인증 화면은 이미 정적 쉘로 프리렌더되고, 쿠키를 읽는 헤더(`AuthButton`)만 Suspense로 스트리밍하므로 추가 캐시 이득이 없다
+  - ✅ 이미지 LCP: 목록 첫 카드 커버가 LCP인데 지연 로딩이라 Next 경고 발생 → 첫 화면 카드 2개(데스크톱 첫 줄)는 `loading="eager"`, 상세 상단 커버는 Next 16에서 deprecated된 `priority` 대신 `preload` (`EventCover`의 `loadingMode`). 360·1280px 재측정 시 LCP 경고 0
+  - ✅ 인덱스·쿼리 점검: `events(host_id, starts_at)`, `rsvps(event_id)`, `rsvps(user_id)`, 대기자 부분 인덱스, `event_reports` 외래 키 인덱스가 이미 있음. 이벤트 2000개·응답 4000개 합성 데이터(롤백)로 내 이벤트·내 응답·상세 쿼리 모두 인덱스 스캔 1ms 안팎. RLS 정책은 모두 `(select auth.uid())`·`(select is_admin())` 형태라 행마다 재평가되지 않음 → 인덱스 추가 없음
+  - ✅ 관리자 이벤트 목록 규모 대응: 전체 조회가 2000개 기준 응답 약 1MB·표 2000행이라, 검색·공개 상태 필터·정렬·개수를 DB에서 처리하는 관리자 RPC `admin_list_events`(최대 100건, 시작 최신순, 4.6ms)로 교체하고 "N건 중 최근 100건 표시" 안내. 그 이전 이벤트는 검색으로 찾는다 (사용자 목록과 같은 방식)
+  - ✅ `get_advisors` 재점검: performance는 `event_reports_reporter_id_idx` 미사용(INFO)만 — 프로필 삭제 cascade용 외래 키 인덱스라 유지(지우면 `unindexed_foreign_keys` 경고로 바뀜). security는 기존에 기록한 의도된 security definer 경고와 유출 비밀번호 보호 비활성(Dashboard 설정, Task 010-b에서 사용자 작업)
+  - 알려진 한계(현 규모에서는 문제 없음): 한 사용자가 수천 개 이벤트에 응답하면 `getMyEvents`의 `.in("id", …)` URL이 길어진다. 신고 관리는 탭 개수 때문에 신고 전체를 읽는다
+  - ✅ `npm run check-all`, `npm run build` 통과 확인
   - Vercel 배포, 환경 변수·Supabase Auth 리다이렉트 URL 설정
   - 커스텀 SMTP 설정(기본 SMTP는 발송 한도가 낮고 메일 템플릿을 수정할 수 없음) → 가입 확인·비밀번호 재설정 템플릿을 `token_hash` 방식(`{{ .RedirectTo }}&token_hash={{ .TokenHash }}&type=email|recovery`)과 한국어 문구로 변경. 다른 기기에서 링크를 열어도 바로 로그인되며, `/auth/confirm`은 이미 두 방식을 모두 처리한다 (Task 006 결정)
   - 성공 지표(응답률, 링크→응답 전환율, 주최자 재사용) 측정 방안 정리

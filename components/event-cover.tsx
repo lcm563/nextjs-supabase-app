@@ -8,8 +8,13 @@ type EventCoverProps = {
   /** 장식용(카드 썸네일)이면 빈 문자열 */
   alt: string;
   variant: "card" | "hero";
-  /** 상세 상단처럼 첫 화면에 보이는 이미지만 true */
-  priority?: boolean;
+  /**
+   * 첫 화면 로딩 방식 (Next 16: priority 대신)
+   * - "preload": LCP가 확실한 단일 이미지 (상세 상단). <head>에 preload 링크를 넣는다
+   * - "eager": 첫 화면에 보일 수 있는 여러 이미지 (목록 앞쪽 카드). 지연 로딩만 끈다
+   * - 생략: 지연 로딩
+   */
+  loadingMode?: "preload" | "eager";
   className?: string;
 };
 
@@ -23,7 +28,7 @@ export function EventCover({
   src,
   alt,
   variant,
-  priority,
+  loadingMode,
   className,
 }: EventCoverProps) {
   return (
@@ -40,7 +45,8 @@ export function EventCover({
           alt={alt}
           fill
           sizes={SIZES[variant]}
-          priority={priority}
+          preload={loadingMode === "preload"}
+          loading={loadingMode === "eager" ? "eager" : undefined}
           // blob: 미리보기는 최적화 서버가 읽을 수 없다 (.svg는 Next가 자동으로 건너뜀)
           unoptimized={src.startsWith("blob:")}
           className="object-cover"

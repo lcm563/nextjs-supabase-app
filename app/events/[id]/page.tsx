@@ -71,7 +71,7 @@ async function EventDetailContent({
         src={event.cover_image_url}
         alt={`${event.title} 커버 이미지`}
         variant="hero"
-        priority
+        loadingMode="preload"
       />
       {isHidden && (
         <div

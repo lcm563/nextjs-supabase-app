@@ -196,6 +196,20 @@ export type Database = {
         Args: { p_report_id: string };
         Returns: undefined;
       };
+      admin_list_events: {
+        Args: {
+          p_limit?: number;
+          p_offset?: number;
+          p_search?: string;
+          p_status?: string;
+        };
+        Returns: {
+          event_id: string;
+          hidden_at: string;
+          hidden_reason: string;
+          total_count: number;
+        }[];
+      };
       admin_list_users: {
         Args: { p_limit?: number; p_offset?: number; p_search?: string };
         Returns: {

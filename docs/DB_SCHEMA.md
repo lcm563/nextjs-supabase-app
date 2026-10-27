@@ -425,6 +425,13 @@ create index event_reports_open_idx on public.event_reports (created_at) where s
   - security: 관리자 RPC 5종과 `get_event_hidden_states`가 `authenticated_security_definer_function_executable` 경고로 나온다. 로그인 사용자가 호출해야 하고 함수 안에서 `is_admin()`(또는 주최자 여부)을 확인하므로 **의도된 예외**다.
   - performance: `unused_index`(INFO)만 나온다.
 
+**추가: `admin_list_events` (Task 010-a, 2026-10-27, 마이그레이션 `admin_list_events`)**
+
+- `admin_list_events(p_search, p_status = 'all', p_limit = 100, p_offset = 0)` → `event_id, hidden_at, hidden_reason, total_count`
+- 관리자 이벤트 목록이 전체 이벤트·응답을 읽어 2000개 기준 응답이 약 1MB였다. `hidden_at`은 `authenticated`가 조회·필터할 수 없어서 관리자 RPC로 검색(제목·주최자 이름, `%`·`_`는 글자 그대로)·상태(`all | visible | hidden`)·정렬(시작 최신순)·개수(1~100)를 처리한다. 앱은 고른 id의 본문과 응답만 `events`에서 읽는다.
+- 다른 관리자 RPC와 같이 `is_admin()`이 아니면 `FORBIDDEN`, 범위를 벗어나면 `VALIDATION`이다. 실행 권한은 `authenticated`에만 있다.
+- 검증(합성 이벤트 2000개, 롤백): 일반 사용자 `FORBIDDEN`, 전체 100행·`total_count` 2001·최신순, 숨김 11·공개 1990, 주최자·제목 검색, `%` 0건, offset, limit 101·잘못된 상태는 `VALIDATION`, 4.6ms.
+
 ### 9-6. 소셜 로그인 가입 시 프로필
 
 4장의 `handle_new_user`를 아래 순서의 fallback으로 바꾼다. provider마다 이름 키가 다르다(Google `full_name`·`name`, Kakao `nickname`·`name`, Naver 커스텀 OIDC `name`).

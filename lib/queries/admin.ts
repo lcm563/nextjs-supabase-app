@@ -2,7 +2,6 @@
 // 관리자 RPC는 함수 안에서 is_admin()을 확인하고, events·event_reports는 RLS가 관리자에게 전체를 보여준다 (DB_SCHEMA.md 9장).
 
 import {
-  getHiddenStates,
   LIST_SELECT,
   toListItem,
   type EventRow,
@@ -24,13 +23,8 @@ import {
 import type { EventListItem } from "@/types/event";
 import { z } from "zod";
 
-// 관리자 RPC의 페이지 크기 상한 (admin_list_users의 p_limit 검증과 같다)
+// 관리자 RPC의 페이지 크기 상한 (admin_list_users·admin_list_events의 p_limit 검증과 같다)
 const ADMIN_PAGE_LIMIT = 100;
-
-// ilike 패턴: 검색어의 %, _ 는 글자 그대로 찾는다
-function toIlikePattern(q: string): string {
-  return `%${q.replace(/[\\%_]/g, (char) => `\\${char}`)}%`;
-}
 
 // 현재 사용자가 관리자인지 (비로그인이면 false)
 export async function getIsAdmin(): Promise<boolean> {
@@ -110,62 +104,47 @@ export async function getRecentUsers(limit: number): Promise<AdminUserRow[]> {
   return (await listUsers(supabase, { limit })).rows;
 }
 
-// 이벤트 관리 목록 (숨김 포함, 시작 최신순). q: 제목·주최자 이름 부분 일치
+// 이벤트 관리 목록 (숨김 포함, 시작 최신순, 최대 100건). q: 제목·주최자 이름 부분 일치
+// 검색·공개 상태 필터·정렬·개수 제한은 admin_list_events RPC가 하고(hidden_at은 직접 필터할 수 없음),
+// 고른 id의 본문·응답 집계만 events에서 읽는다. 2000건 기준 전체 조회는 응답이 약 1MB라 제한한다 (Task 010-a)
 export async function getAdminEvents({
   q = "",
   status = "all",
 }: {
   q?: string;
   status?: AdminEventStatusFilter;
-} = {}): Promise<EventListItem[]> {
+} = {}): Promise<{ rows: EventListItem[]; total: number }> {
   const supabase = await createClient();
-
-  let rows: EventRow[];
-  if (q) {
-    const pattern = toIlikePattern(q);
-    const { data: hosts, error: hostError } = await supabase
-      .from("profiles")
-      .select("id")
-      .ilike("display_name", pattern);
-    if (hostError) throw hostError;
-
-    // 제목 일치와 주최자 이름 일치를 따로 조회해 합친다 (검색어를 or 필터 문자열에 넣지 않기 위해)
-    const [byTitle, byHost] = await Promise.all([
-      supabase.from("events").select(LIST_SELECT).ilike("title", pattern),
-      hosts.length > 0
-        ? supabase
-            .from("events")
-            .select(LIST_SELECT)
-            .in(
-              "host_id",
-              hosts.map((host) => host.id)
-            )
-        : null,
-    ]);
-    if (byTitle.error) throw byTitle.error;
-    if (byHost?.error) throw byHost.error;
-    const merged = new Map(
-      [...byTitle.data, ...(byHost?.data ?? [])].map((row) => [row.id, row])
-    );
-    rows = [...merged.values()];
-  } else {
-    const { data, error } = await supabase.from("events").select(LIST_SELECT);
-    if (error) throw error;
-    rows = data;
-  }
-
-  const hidden = await getHiddenStates(
-    supabase,
-    rows.map((row) => row.id)
+  const { data: picked, error: pickError } = await supabase.rpc(
+    "admin_list_events",
+    { p_search: q, p_status: status, p_limit: ADMIN_PAGE_LIMIT }
   );
-  return rows
-    .map((row) => toListItem(supabase, row, null, hidden.get(row.id)))
-    .filter((event) => {
-      if (status === "visible") return event.hidden_at === null;
-      if (status === "hidden") return event.hidden_at !== null;
-      return true;
-    })
-    .sort((a, b) => b.starts_at.localeCompare(a.starts_at));
+  if (pickError) throw pickError;
+  if (picked.length === 0) return { rows: [], total: 0 };
+
+  const { data, error } = await supabase
+    .from("events")
+    .select(LIST_SELECT)
+    .in(
+      "id",
+      picked.map((row) => row.event_id)
+    );
+  if (error) throw error;
+
+  // RPC가 정한 순서(시작 최신순)를 유지한다
+  const byId = new Map<string, EventRow>(data.map((row) => [row.id, row]));
+  const rows = picked.flatMap((pick) => {
+    const row = byId.get(pick.event_id);
+    return row
+      ? [
+          toListItem(supabase, row, null, {
+            hidden_at: pick.hidden_at,
+            hidden_reason: pick.hidden_reason,
+          }),
+        ]
+      : [];
+  });
+  return { rows, total: picked[0].total_count };
 }
 
 // 신고 목록 (최신순)
