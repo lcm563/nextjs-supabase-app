@@ -4,9 +4,16 @@ import { ThemeProvider } from "next-themes";
 import { Toaster } from "@/components/ui/sonner";
 import "./globals.css";
 
-const defaultUrl = process.env.VERCEL_URL
-  ? `https://${process.env.VERCEL_URL}`
-  : "http://localhost:3000";
+// 공유 미리보기(og:image 등)의 절대 주소 기준.
+// Production은 고정 도메인을 쓴다: 배포마다 생기는 VERCEL_URL은 Vercel 배포 보호가 걸려 있어
+// 카카오톡 등이 이미지를 가져오지 못한다(302 → Vercel 로그인). Preview·로컬은 각자 주소를 쓴다.
+const defaultUrl =
+  process.env.VERCEL_ENV === "production" &&
+  process.env.VERCEL_PROJECT_PRODUCTION_URL
+    ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`
+    : process.env.VERCEL_URL
+      ? `https://${process.env.VERCEL_URL}`
+      : "http://localhost:3000";
 
 export const metadata: Metadata = {
   metadataBase: new URL(defaultUrl),
