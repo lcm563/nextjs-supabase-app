@@ -8,6 +8,8 @@ export type ActionErrorCode =
   | "CAPACITY"
   | "DEADLINE_PASSED"
   | "EVENT_ENDED"
+  | "LAST_ADMIN"
+  | "ALREADY_REPORTED"
   | "INTERNAL";
 
 export type ActionError = {

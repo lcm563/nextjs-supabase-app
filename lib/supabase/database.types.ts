@@ -14,6 +14,54 @@ export type Database = {
   };
   public: {
     Tables: {
+      event_reports: {
+        Row: {
+          created_at: string;
+          detail: string | null;
+          event_id: string;
+          id: string;
+          reason: string;
+          reporter_id: string;
+          resolved_at: string | null;
+          status: string;
+        };
+        Insert: {
+          created_at?: string;
+          detail?: string | null;
+          event_id: string;
+          id?: string;
+          reason: string;
+          reporter_id: string;
+          resolved_at?: string | null;
+          status?: string;
+        };
+        Update: {
+          created_at?: string;
+          detail?: string | null;
+          event_id?: string;
+          id?: string;
+          reason?: string;
+          reporter_id?: string;
+          resolved_at?: string | null;
+          status?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "event_reports_event_id_fkey";
+            columns: ["event_id"];
+            isOneToOne: false;
+            referencedRelation: "events";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "event_reports_reporter_id_fkey";
+            columns: ["reporter_id"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       events: {
         Row: {
           capacity: number | null;
@@ -21,6 +69,8 @@ export type Database = {
           created_at: string;
           description: string | null;
           ends_at: string | null;
+          hidden_at: string | null;
+          hidden_reason: string | null;
           host_id: string;
           id: string;
           location: string;
@@ -35,6 +85,8 @@ export type Database = {
           created_at?: string;
           description?: string | null;
           ends_at?: string | null;
+          hidden_at?: string | null;
+          hidden_reason?: string | null;
           host_id: string;
           id?: string;
           location: string;
@@ -49,6 +101,8 @@ export type Database = {
           created_at?: string;
           description?: string | null;
           ends_at?: string | null;
+          hidden_at?: string | null;
+          hidden_reason?: string | null;
           host_id?: string;
           id?: string;
           location?: string;
@@ -73,18 +127,21 @@ export type Database = {
           created_at: string;
           display_name: string;
           id: string;
+          role: string;
         };
         Insert: {
           avatar_url?: string | null;
           created_at?: string;
           display_name: string;
           id: string;
+          role?: string;
         };
         Update: {
           avatar_url?: string | null;
           created_at?: string;
           display_name?: string;
           id?: string;
+          role?: string;
         };
         Relationships: [];
       };
@@ -135,6 +192,41 @@ export type Database = {
       [_ in never]: never;
     };
     Functions: {
+      admin_dismiss_report: {
+        Args: { p_report_id: string };
+        Returns: undefined;
+      };
+      admin_list_users: {
+        Args: { p_limit?: number; p_offset?: number; p_search?: string };
+        Returns: {
+          created_at: string;
+          display_name: string;
+          email: string;
+          id: string;
+          last_sign_in_at: string;
+          provider: string;
+          role: string;
+          total_count: number;
+        }[];
+      };
+      admin_set_event_hidden: {
+        Args: { p_event_id: string; p_hidden: boolean; p_reason?: string };
+        Returns: undefined;
+      };
+      admin_set_user_role: {
+        Args: { p_role: string; p_target: string };
+        Returns: undefined;
+      };
+      admin_stats: { Args: never; Returns: Json };
+      get_event_hidden_states: {
+        Args: { p_event_ids: string[] };
+        Returns: {
+          event_id: string;
+          hidden_at: string;
+          hidden_reason: string;
+        }[];
+      };
+      is_admin: { Args: never; Returns: boolean };
       promote_waitlist: { Args: { p_event_id: string }; Returns: number };
       respond_to_event: {
         Args: { p_event_id: string; p_status: string };
