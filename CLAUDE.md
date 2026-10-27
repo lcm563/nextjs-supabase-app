@@ -85,7 +85,7 @@ npm run build       # 빌드 성공 확인
 - **보호된 라우트**: `/events/**` 등 공개 경로가 아닌 모든 경로는 인증된 사용자만 접근 가능
 - **리다이렉트 경로 검증**: 로그인·이메일 확인 후 이동하는 `next` 값은 반드시 `lib/safe-next.ts`의 `sanitizeNext()`로 검증 (오픈 리다이렉트 방지)
 - **원래 화면 복귀**: proxy가 비로그인 접근을 `/auth/login?next=<경로+쿼리>`로 보내고, 로그인·가입 페이지가 `next`를 서버에서 검증해 폼에 넘긴다. 인증 화면 사이 링크는 `withNext()`로 `next`를 유지
-- **이메일 링크**(가입 확인·비밀번호 재설정): `emailRedirectTo`/`redirectTo`는 `/auth/confirm?next=...`. `/auth/confirm`이 기본 템플릿의 `code`(현재 사용, PKCE라 요청한 브라우저에서만 세션 생성)와 `token_hash`(커스텀 SMTP 설정 후 전환 예정, Task 010)를 모두 처리한다. 다른 기기에서 가입 확인 링크를 열면 인증은 끝난 상태이므로 `/auth/login?notice=email-confirmed&next=...`로 보낸다. 돌아올 주소는 `emailConfirmUrl()`로 만든다(항상 `?next=` 포함)
+- **이메일 링크**(가입 확인·비밀번호 재설정): `emailRedirectTo`/`redirectTo`는 `/auth/confirm?next=...`. 메일은 커스텀 SMTP(네이버, Task 010-c)로 보내고, 가입 확인·비밀번호 재설정 템플릿은 `token_hash` 방식(`{{ .RedirectTo }}&token_hash={{ .TokenHash }}&type=email|recovery`, 문안은 `docs/EMAIL_TEMPLATES.md`)이라 **어느 기기에서 열어도** `/auth/confirm`이 `verifyOtp`로 바로 세션을 만든다. 만료·재사용 링크는 한국어 오류 화면으로 안내한다. `/auth/confirm`은 템플릿 전환 전에 보낸 메일을 위해 `code`(PKCE, 요청한 브라우저에서만 세션) 분기도 유지하며, 다른 기기에서 연 `code` 링크는 `/auth/login?notice=email-confirmed&next=...`로 보낸다. 돌아올 주소는 `emailConfirmUrl()`로 만든다(**항상 `?next=` 포함** — 템플릿이 `&`로 이어 붙이므로 필수). 메일 발송 실패는 auth 로그(`user_confirmation_requested`의 `error`)에서 확인한다
 - **비밀번호 규칙**: 최소 8자(`lib/validations/password.ts`의 `PASSWORD_MIN_LENGTH`)는 Supabase Dashboard > Authentication > Email의 최소 길이와 **같아야 한다**(바꿀 때 둘 다). 유출 비밀번호 검사는 Pro 플랜 기능이라 Free 플랜에서는 쓰지 않는다. 인증 폼의 Supabase 오류는 원문(영어) 대신 `lib/auth/auth-error.ts`의 `authErrorMessage()`로 한국어 안내를 보여준다
 - **공유 링크 미리보기**: `/events/[id]`는 로그인이 필요하므로 카카오톡 등 미리보기는 루트 기본 메타데이터 카드로 표시됨 (PRD 8장)
 
@@ -213,7 +213,8 @@ import { Button } from "@/components/ui/button";
 
 ### 로그인이 필요한 브라우저 검증
 
-- 연결된 Supabase 프로젝트의 계정은 사용자 본인 계정 두 개뿐이다: `lcm563@naver.com`(표시 이름 lcm563, **관리자**)과 `lcm563@kakao.com`(Bomdong, 일반 사용자). 별도 테스트 계정은 없으며, 비밀번호는 문서에 적지 않는다.
+- 연결된 Supabase 프로젝트의 계정은 사용자 본인 계정 세 개뿐이다: `lcm563@naver.com`(표시 이름 lcm563, **관리자**, 이메일+Google), `lcm563@kakao.com`(Bomdong, 일반 사용자, 이메일+Kakao), `cmlucky.lee@gmail.com`(만따기, 일반 사용자, 이메일 가입 — Task 010-c 메일 검증용으로 사용자가 만든 테스트 계정). 비밀번호는 문서에 적지 않는다.
+- 가입 확인 메일을 다시 검증하려면 **아직 가입하지 않은 주소**가 필요하다(이미 있는 주소로 가입하면 메일이 가지 않는다). 사용자가 직접 가입하고, 확인은 auth 로그로 한다.
 - 로그인이 필요하면 임의 계정으로 시도하거나 계정을 새로 만들지 말고, 사용자에게 Playwright 브라우저에서 직접 로그인해 달라고 요청한다.
 - 관리자 화면 확인: 관리자 계정(`lcm563@naver.com`)으로 로그인해 확인한다. 일반 사용자 시점은 일반 계정으로 로그인하거나, SQL 한 번의 호출 안에서 `request.jwt.claims`·`role`을 바꿔 확인하고 롤백한다. 역할을 바꾸는 테스트 뒤에는 첫 관리자 역할이 유지되는지 확인한다.
 - 랜딩 점검 스크립트: `.playwright-mcp/audit-landing.js`(git 제외). 비로그인은 빈 컨텍스트, 로그인은 배포 사이트 세션 쿠키를 복사한 별도 컨텍스트로 360·768·1280 × 라이트·다크를 확인한다(로그인 상태가 필요하면 배포 사이트에 먼저 로그인해 둔다)

@@ -14,7 +14,7 @@
 > 카풀(2차)·정산(3차)·네이버 로그인(4차)은 MVP 범위 밖이며 [MVP 이후 로드맵](#mvp-이후-로드맵)에 정리합니다.
 
 **📅 최종 업데이트**: 2026-10-26
-**📊 진행 상황**: Phase 1·2·3 완료(소셜 로그인은 Google·Kakao), Phase 4 대기 중 (15/18 Tasks 완료, 83%)
+**📊 진행 상황**: Phase 1~4 모두 완료(소셜 로그인은 Google·Kakao) — 18/18 Tasks 완료(100%), 배포: https://nextjs-supabase-app-swart.vercel.app
 
 ## 개발 워크플로우
 
@@ -172,7 +172,7 @@
     | F-08 참여자 현황              | ✅   | 참석·대기·미정·불참 목록과 이름, 로그인 사용자 모두 열람                 |
     | F-09 이벤트 수정/삭제         | ✅   | 주최자만(UI·Server Action·RLS), 삭제 확인 대화상자                       |
 
-### Phase 4: 고급 기능 및 최적화
+### Phase 4: 고급 기능 및 최적화 ✅
 
 - **Task 009: P1 기능 구현** ✅ - 완료 (Phase 2·3에서 구현, 실데이터로 수용 기준 재확인 — 코드 변경 없음)
   - ✅ 이벤트 복제 (`/events/new?copy=[id]`, 일시만 새로 지정) — F-10
@@ -229,7 +229,7 @@
   - ✅ WCAG AA 미달 토큰(`primary`, `muted-foreground`, `destructive`)은 밝기만 조정, 인증 폼 오류 문구를 `text-destructive`로 통일
   - ✅ 76조합 대비 점검 0건 (폰트 Geist·그림자는 유지)
 
-- **Task 010: 성능 최적화 및 배포**
+- **Task 010: 성능 최적화 및 배포** ✅ - 완료
   - ✅ Server Component 중심 렌더링 점검 (Task 010-a) — 측정 근거가 있는 항목만 최적화
     - 빌드: 사용자 화면 전부 Partial Prerender(◐, 정적 쉘 + Suspense 안에서 요청 시점 데이터), OG 이미지만 정적(○), 인증 콜백·확인 Route Handler만 동적(ƒ)
     - `use cache` 미적용: 목록·상세·관리자는 로그인 사용자별 데이터이고 RLS·응답 상태에 따라 결과가 달라 공유 캐시 대상이 아니다. 랜딩·인증 화면은 이미 정적 쉘로 프리렌더되고, 쿠키를 읽는 헤더(`AuthButton`)만 Suspense로 스트리밍하므로 추가 캐시 이득이 없다
@@ -247,8 +247,11 @@
     - 배포 URL 점검(관리자 계정): 비로그인 이벤트 링크 → Google 로그인 → 원래 이벤트 복귀, 커버 포함 생성(Storage 업로드·이미지 최적화 200), 공유 링크(Production 도메인) 복사, 참석(정원 1 마감), 수정, 삭제(응답·커버 파일 정리, 삭제된 링크 404), 관리자 대시보드 수치 = SQL 집계, 점검 스크립트 19개 화면 × 360·1280 × 라이트·다크(76조합) 문제·콘솔 오류 0. 테스트 이벤트는 삭제
     - 일반 계정 Kakao 로그인: 사용자 메뉴에 관리자 링크 없음, `/admin` 404. 이메일 로그인은 로컬에서 확인한 흐름과 같아 배포에서는 생략(차이는 Redirect URL뿐이며 Google·Kakao로 확인)
     - 사용자 피드백 반영: 로그인한 상태에서 랜딩 "무료로 시작하기"가 가입 화면으로 보내던 흐름 수정 — 랜딩 버튼을 로그인 여부에 따라 "이벤트 만들기·내 이벤트 보기" / "무료로 시작하기·로그인"으로(`LandingActions`, 정적 쉘 유지), 로그인·가입 화면은 이미 로그인했으면 `next`(기본 `/events`)로 이동
-  - 커스텀 SMTP 설정(기본 SMTP는 발송 한도가 낮고 메일 템플릿을 수정할 수 없음) → 가입 확인·비밀번호 재설정 템플릿을 `token_hash` 방식(`{{ .RedirectTo }}&token_hash={{ .TokenHash }}&type=email|recovery`)과 한국어 문구로 변경. 다른 기기에서 링크를 열어도 바로 로그인되며, `/auth/confirm`은 이미 두 방식을 모두 처리한다 (Task 006 결정)
-  - 성공 지표(응답률, 링크→응답 전환율, 주최자 재사용) 측정 방안 정리
+  - ✅ 커스텀 SMTP 설정(기본 SMTP는 발송 한도가 낮고 메일 템플릿을 수정할 수 없음) → 가입 확인·비밀번호 재설정 템플릿을 `token_hash` 방식(`{{ .RedirectTo }}&token_hash={{ .TokenHash }}&type=email|recovery`)과 한국어 문구로 변경 (Task 010-c, 2026-10-27)
+    - SMTP: 네이버(`smtp.naver.com:465`, 발신 `lcm563@naver.com`). 도메인이 없어 Resend 등은 보류. 처음 설정에서 `535 Username and Password not accepted`(네이버 인증 거부)로 가입 메일 3건이 실패했고, 사용자가 네이버 쪽 설정을 고친 뒤 정상 발송. 발송 실패 시 가입은 롤백되어 계정이 남지 않음
+    - 템플릿 문안: [EMAIL_TEMPLATES.md](./EMAIL_TEMPLATES.md). `/auth/confirm`의 `verifyOtp` 실패(만료·재사용)는 한국어 안내로 변경
+    - 실제 검증(배포 사이트, 사용자 테스트 주소): 가입 → 확인 메일 → `POST /verify` 200·`user_signedup`(Vercel 싱가포르 함수에서 `token_hash` 검증), 비밀번호 재설정 → `POST /verify` 200 → 새 비밀번호 저장(`PUT /user`) → 이전 비밀번호 거부·새 비밀번호 로그인 성공 (auth 로그)
+  - ✅ 성공 지표 측정 방안 정리: [METRICS.md](./METRICS.md) — 주최자 재사용·이벤트당 응답 수·첫 응답까지 시간은 SQL로 측정(합성 데이터 검증), 응답률·링크→응답 전환율·공지 소요 시간은 조회·공유 기록이 필요해 MVP 이후 결정
 
 ## MVP 이후 로드맵
 

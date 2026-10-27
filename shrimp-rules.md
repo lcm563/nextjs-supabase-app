@@ -99,7 +99,7 @@
 
 - Follow ROADMAP order (Task 001 → 010). Do one Task at a time.
 - API/business-logic tasks: test with Playwright MCP (E2E scenarios in a "## 테스트 체크리스트" section of the task).
-- Browser testing that needs login: the linked Supabase project has only the user's own accounts (see `CLAUDE.md`). DO NOT create accounts or try other credentials; ask the user to log in in the Playwright window. Admin screens: log in as the admin account (`lcm563@naver.com`). Non-admin checks: the user account (`lcm563@kakao.com`) or one rolled-back SQL call with `request.jwt.claims`/`role` set. After role-change tests, confirm the first admin is still admin. Audit script: `.playwright-mcp/audit-phase3.js` (set the event ids at the top first).
+- Browser testing that needs login: the linked Supabase project has only the user's own accounts (see `CLAUDE.md`). DO NOT create accounts or try other credentials; ask the user to log in in the Playwright window. Admin screens: log in as the admin account (`lcm563@naver.com`). Non-admin checks: the user accounts (`lcm563@kakao.com`, or the email-signup test account `cmlucky.lee@gmail.com`) or one rolled-back SQL call with `request.jwt.claims`/`role` set. After role-change tests, confirm the first admin is still admin. Audit script: `.playwright-mcp/audit-phase3.js` (set the event ids at the top first).
 - Completion gate after each task: `npm run check-all` AND `npm run build` must pass. Then stop and wait for user instruction.
 - Git: pre-commit runs lint-staged; pre-push runs `npm run typecheck`. DO NOT use `--no-verify`. Commit messages follow `.claude/commands/git/commit.md` (emoji + conventional). Commit only when asked.
 
