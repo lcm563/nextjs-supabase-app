@@ -217,6 +217,13 @@
     - [x] 이벤트 강제 삭제 및 통계 수치 확인 — 다른 사용자 이벤트와 Storage 커버 삭제, 신고 cascade, 대시보드 6개 지표가 SQL 집계와 일치(작업 전·후)
   - ✅ 점검 스크립트(`.playwright-mcp/audit-phase3.js`, 역할 쿠키 제거·관리자 세션): 21개 화면 × 360·1280px × 라이트·다크(84조합) 대비·가로 넘침·터치 영역·콘솔 오류 0건
 
+- **추가: 랜딩 재구성** ✅ - 완료 (사용자 요청, 2026-10-27)
+  - ✅ 시안(데스크톱 1280·모바일 390 캔버스) 확정 후 구현: 히어로(정체성 배지 + 이벤트 상세 미리보기) → 세 단계 → 역할별 기능(주최자·참여자 각 4개) → 사용 예 → FAQ 3개(요금 항목은 사용자 결정으로 제외) → 마지막 CTA. 구성은 PRD 6장 "랜딩 구성"
+  - ✅ 로그인 여부에 따른 부분만 Suspense 안에서 요청 시점에 그림(`components/landing-actions.tsx`: 히어로 버튼·다가오는 내 이벤트 띠·마지막 CTA). 나머지는 정적 쉘이라 `/`는 Partial Prerender(◐) 유지. `getCurrentUserId`는 React `cache()`로 요청당 한 번만 세션 확인
+  - ✅ 미리보기(`components/landing-preview.tsx`)는 고정 예시 데이터로 DB를 읽지 않고, 실제 `CapacityBadge`를 재사용. 응답 버튼은 눌러지지 않는 모양만(Tab 순서에서 제외)
+  - ✅ 반응형: 히어로 2열(lg)·세 단계 3칸(md)·역할별 2칸(md) ↔ 모바일 1열. 색은 테마 토큰만 사용(다크 모드 자동 대응)
+  - ✅ 점검(`.playwright-mcp/audit-landing.js`): 비로그인·로그인 × 360·768·1280 × 라이트·다크(12조합) 대비·가로 넘침·터치 영역·콘솔 오류 0, 로그인 시 버튼·요약 띠 확인
+
 - **추가: UI 테마 변경** ✅ - 완료 (사용자 요청)
   - ✅ tweakcn "Clean Slate"(slate 배경 + indigo primary)를 Tailwind v3 HSL 토큰으로 변환해 `app/globals.css`에 적용
   - ✅ WCAG AA 미달 토큰(`primary`, `muted-foreground`, `destructive`)은 밝기만 조정, 인증 폼 오류 문구를 `text-destructive`로 통일

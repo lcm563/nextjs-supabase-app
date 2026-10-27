@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/server";
 import type { Tables } from "@/lib/supabase/database.types";
 import type { EventDetail, EventListItem } from "@/types/event";
 import { isRsvpStatus, type Attendee, type RsvpStatus } from "@/types/rsvp";
+import { cache } from "react";
 import { z } from "zod";
 
 // hidden_*는 authenticated에 SELECT 권한이 없으므로 `*` 대신 컬럼을 나열하고,
@@ -104,11 +105,12 @@ function toAttendees(rsvps: DetailRsvpRow[]): Attendee[] {
 }
 
 // 로그인 사용자 id. 세션이 없으면 null
-export async function getCurrentUserId(): Promise<string | null> {
+// 한 요청에서 여러 Suspense 경계(랜딩 등)가 불러도 세션 확인은 한 번만 하도록 요청 단위로 캐시한다
+export const getCurrentUserId = cache(async (): Promise<string | null> => {
   const supabase = await createClient();
   const { data } = await supabase.auth.getClaims();
   return data?.claims.sub ?? null;
-}
+});
 
 // 내 이벤트 목록 (정렬은 페이지에서 한다)
 // hosting: 내가 주최 / attending: 타인 주최 중 내 응답이 불참이 아닌 이벤트
