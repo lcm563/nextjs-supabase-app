@@ -22,7 +22,7 @@ function revalidateAdmin(eventId?: string) {
   if (eventId) revalidatePath(`/events/${eventId}`);
 }
 
-// 이벤트 숨김·복구. 숨기면 그 이벤트의 처리 대기 신고가 함께 처리된다
+// 이벤트 숨김·복구. 숨기면 그 이벤트의 처리 대기 신고가 resolved로, 복구하면 resolved 신고가 dismissed로 바뀐다
 export async function setEventHidden(
   input: unknown
 ): Promise<ActionResult<null>> {

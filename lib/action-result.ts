@@ -26,7 +26,7 @@ export const ACTION_ERROR_MESSAGES: Record<ActionErrorCode, string> = {
   DEADLINE_PASSED: "응답이 마감되었습니다",
   EVENT_ENDED: "종료된 이벤트입니다",
   LAST_ADMIN: "마지막 관리자는 해제할 수 없습니다",
-  ALREADY_REPORTED: "이미 신고한 이벤트입니다",
+  ALREADY_REPORTED: "이미 신고한 이벤트입니다. 관리자가 검토 중입니다",
   INTERNAL: "잠시 후 다시 시도해주세요",
 };
 
