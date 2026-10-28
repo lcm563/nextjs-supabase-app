@@ -35,7 +35,8 @@ export async function respondToEvent(
 
 const reportEventInputSchema = reportInputSchema.extend({ event_id: z.uuid() });
 
-// 이벤트 신고. 신고자는 세션 사용자로 정하고, 같은 이벤트 재신고는 unique 제약으로 막는다 (DB_SCHEMA.md 9-4)
+// 이벤트 신고. 신고자는 세션 사용자로 정한다. 처리 대기(open) 신고가 있으면 부분 unique 인덱스가 막고,
+// 처리(숨김·기각)된 뒤에는 다시 신고할 수 있다 (DB_SCHEMA.md 9-4)
 export async function reportEvent(input: unknown): Promise<ActionResult<null>> {
   const parsed = reportEventInputSchema.safeParse(input);
   if (!parsed.success) {

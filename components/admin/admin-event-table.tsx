@@ -113,7 +113,10 @@ export function AdminEventTable({
       return;
     }
     updateRow(row.id, { hidden: false, hidden_reason: null });
-    toast.success(`‘${row.title}’을(를) 다시 공개했습니다`);
+    // DB가 숨김으로 처리됐던 신고를 기각으로 바꾼다
+    toast.success(
+      `‘${row.title}’을(를) 다시 공개했습니다. 숨김 처리된 신고는 기각으로 바뀝니다`
+    );
   };
 
   const remove = async () => {
