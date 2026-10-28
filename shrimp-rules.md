@@ -61,11 +61,13 @@
 - `profiles` row creation: `auth.users` insert trigger.
 - After every schema change, in order: `get_advisors` (security + performance) → fix findings → `generate_typescript_types` → save to `lib/supabase/database.types.ts`.
 - Indexes required: `rsvps(event_id)`, `events(host_id, starts_at)`.
+- Reports (`event_reports`): uniqueness is ONLY for `open` reports (partial unique index `event_reports_open_unique`). DO NOT restore `unique (event_id, reporter_id)` — closed reports must not block a new report. Status changes go through admin RPCs only; hiding → `open`→`resolved`, restoring → `resolved`→`dismissed`, so event visibility and report status never disagree.
 
 ## Feature Implementation Rules
 
 - Mutations (create/update/delete event, RSVP change) use Server Actions. Validate input with zod server-side. Return the shared result type defined in `types/` (do not invent per-action shapes).
 - After a mutation, refresh UI with `revalidatePath` or cache tag invalidation.
+- NEVER swallow an error into `null`/a generic message without logging it. Cover upload (`components/event-form.tsx`) maps Storage errors with `coverUploadErrorMessage()` (`lib/storage/event-covers.ts`) and `console.error`s the raw `status`/`statusCode`/`message`. A Storage error without `status` means the request never reached Supabase (network / security software); confirm with edge logs (`OPTIONS` present, `POST` missing).
 - Event detail page (`/events/[id]`) renders as Server Component; only interactive pieces (`RsvpButtons`, `ShareLinkButton`, delete dialog) are Client Components.
 - Share link target is `/events/[id]`. Non-existent ID → `notFound()`.
 - Block RSVP changes after `rsvp_deadline` or after the event ended (F-12, F-14), both in UI and server action.

@@ -199,8 +199,8 @@ event_reports (
   detail      text,
   status      text not null default 'open',   -- open | resolved | dismissed
   created_at  timestamptz default now(),
-  resolved_at timestamptz,
-  unique (event_id, reporter_id)
+  resolved_at timestamptz
+  -- unique (event_id, reporter_id) where status = 'open'  (처리 대기 신고만 1건, 처리 후 재신고 가능)
 )
 ```
 
@@ -214,6 +214,8 @@ event_reports (
 | event_reports | 관리자                                               | 본인 명의                              | 관리자             | —             |
 
 - 관리자 판정은 `is_admin()`(`profiles.role`)이고, 숨김·역할 변경·신고 기각·통계·사용자 목록은 관리자 RPC로만 한다. 숨김 상태는 주최자·관리자에게만 RPC로 제공한다.
+- **신고 상태 흐름**: 신고 `open` → 숨김 처리 시 `resolved` / 기각 시 `dismissed`. 숨긴 이벤트를 복구하면 `resolved` 신고는 `dismissed`가 된다(이벤트 공개 상태와 신고 상태가 어긋나지 않게). 같은 사용자는 처리 대기 신고가 있을 때만 중복 신고가 막히고, 처리된 뒤에는 다시 신고할 수 있다 (DB_SCHEMA.md 9-4, Task 011).
+- **커버 업로드 실패 안내**: 브라우저가 Storage에 직접 올리므로 실패 원인(크기·형식·권한·세션 만료·네트워크/보안 프로그램 차단)을 구분해 한국어로 안내하고, 진단용 Storage 오류 원문은 브라우저 콘솔에 남긴다.
 
 - 정원 판정과 대기자 승격은 **동시성 문제**가 있으므로 DB 함수(RPC) 또는 트리거로 트랜잭션 처리한다.
 - 가입 시 `profiles` 자동 생성은 `auth.users` 트리거로 처리한다.

@@ -332,11 +332,23 @@ create table public.event_reports (
   detail      text check (char_length(detail) <= 500),
   status      text not null default 'open' check (status in ('open', 'resolved', 'dismissed')),
   created_at  timestamptz not null default now(),
-  resolved_at timestamptz,
-  unique (event_id, reporter_id)   -- 같은 사람이 같은 이벤트를 중복 신고하지 않음
+  resolved_at timestamptz
 );
 create index event_reports_open_idx on public.event_reports (created_at) where status = 'open';
+-- 처리 대기(open) 신고만 사람·이벤트당 1건. 처리(숨김·기각)된 뒤에는 다시 신고할 수 있다 (Task 011)
+create unique index event_reports_open_unique on public.event_reports (event_id, reporter_id) where status = 'open';
+create index event_reports_event_id_idx on public.event_reports (event_id);
 ```
+
+**신고 상태 흐름 (Task 011)**
+
+| 동작                         | 신고 상태 변화                                       |
+| ---------------------------- | ---------------------------------------------------- |
+| 신고                         | `open` 생성 (같은 사람의 `open`이 있으면 `23505`)    |
+| 숨김 처리                    | 그 이벤트의 `open` → `resolved`                      |
+| 기각                         | 해당 `open` 1건 → `dismissed`                        |
+| 복구(숨김 해제)              | 그 이벤트의 `resolved` → `dismissed` (문제없음 판단) |
+| 처리된 뒤 같은 사람이 재신고 | 새 `open` 행 생성 (이전 신고는 이력으로 남음)        |
 
 | 정책   | 조건                                                                     |
 | ------ | ------------------------------------------------------------------------ |
@@ -379,7 +391,7 @@ create index event_reports_open_idx on public.event_reports (created_at) where s
 | -------------------------------------------------- | ------------------------------------------------------------------------- |
 | `admin_list_users(search text, page int)`          | `AdminUserRow` 목록. `auth.users`의 email·last_sign_in_at·provider를 조인 |
 | `admin_stats()`                                    | `AdminStats` (json). 이번 주는 한국 시간 월요일 0시 기준                  |
-| `admin_set_event_hidden(event_id, hidden, reason)` | 숨김 처리 + 해당 이벤트의 open 신고를 `resolved`로                        |
+| `admin_set_event_hidden(event_id, hidden, reason)` | 숨김 시 open 신고 → `resolved`, 복구 시 resolved 신고 → `dismissed`       |
 | `admin_set_user_role(target, new_role)`            | 9-2 참고                                                                  |
 
 `auth.users`는 클라이언트에 노출되지 않으므로 관리자 사용자 목록은 반드시 이 RPC로 조회한다.
@@ -424,6 +436,16 @@ create index event_reports_open_idx on public.event_reports (created_at) where s
 - **`get_advisors`**
   - security: 관리자 RPC 5종과 `get_event_hidden_states`가 `authenticated_security_definer_function_executable` 경고로 나온다. 로그인 사용자가 호출해야 하고 함수 안에서 `is_admin()`(또는 주최자 여부)을 확인하므로 **의도된 예외**다.
   - performance: `unused_index`(INFO)만 나온다.
+
+**변경: 신고 생애주기 (Task 011, 2026-10-28, 마이그레이션 `report_lifecycle_fix`)**
+
+- 진단(로그): 신고 → 숨김 처리(`resolved`) → 복구 순서로 진행하면 이벤트는 공개인데 신고는 "숨김 처리됨"으로 남았고, 같은 사용자의 재신고는 `unique (event_id, reporter_id)` 위반(`409`)으로 "이미 신고한 이벤트입니다"만 표시됐다.
+- `event_reports_event_id_reporter_id_key`(unique 제약)를 지우고 부분 unique 인덱스 `event_reports_open_unique (event_id, reporter_id) where status = 'open'`로 바꿨다. 처리 대기 중 중복 신고는 그대로 `23505`(`ALREADY_REPORTED`, 문구 "이미 신고한 이벤트입니다. 관리자가 검토 중입니다")이다.
+- 기존 unique가 맡던 `event_id` 외래 키(cascade) 인덱스로 `event_reports_event_id_idx`를 추가했다.
+- `admin_set_event_hidden(p_hidden = false)`가 그 이벤트의 `resolved` 신고를 `dismissed`로 바꾸고 `resolved_at`을 갱신한다. 권한(`authenticated`만 실행)은 `create or replace`로 유지된다.
+- 데이터 정리: 이미 복구된 이벤트에 남은 `resolved` 신고 1건을 `dismissed`로 바꿨다(불일치 0건).
+- 검증(DO 블록, 롤백): 처리 대기 중복 `23505`, 다른 사람 명의·`status` 지정 `42501`, 숨김 `resolved` → 복구 `dismissed` → 재신고 `open` 생성, 기각 후 재신고 `open` 생성, 일반 사용자 신고 조회 0건.
+- `get_advisors`: 새 경고 없음(새 인덱스 `unused_index` INFO만). 생성 타입은 변화 없음.
 
 **추가: `admin_list_events` (Task 010-a, 2026-10-27, 마이그레이션 `admin_list_events`)**
 
