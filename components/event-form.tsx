@@ -16,7 +16,11 @@ import {
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { EVENT_COVER_BUCKET, buildCoverPath } from "@/lib/storage/event-covers";
+import {
+  EVENT_COVER_BUCKET,
+  buildCoverPath,
+  coverUploadErrorMessage,
+} from "@/lib/storage/event-covers";
 import { createClient } from "@/lib/supabase/client";
 import { createEvent, updateEvent } from "@/app/events/actions";
 import {
@@ -40,18 +44,33 @@ type EventFormProps = {
   defaultCoverUrl?: string | null;
 };
 
-// 브라우저에서 Storage로 직접 올린다 (Server Action 본문 1MB 제한 회피). 실패하면 null
-async function uploadCover(file: File): Promise<string | null> {
+// 브라우저에서 Storage로 직접 올린다 (Server Action 본문 1MB 제한 회피).
+// 실패하면 원인별 안내 문구를 돌려주고, 진단용으로 Storage 오류 원문을 콘솔에 남긴다
+async function uploadCover(
+  file: File
+): Promise<{ path: string; error: null } | { path: null; error: string }> {
   const supabase = createClient();
   const { data } = await supabase.auth.getClaims();
   const userId = data?.claims.sub;
-  if (!userId) return null;
+  if (!userId) {
+    console.error("커버 이미지 업로드 실패: 세션 없음");
+    return { path: null, error: coverUploadErrorMessage(null) };
+  }
 
   const path = buildCoverPath(userId, file);
   const { error } = await supabase.storage
     .from(EVENT_COVER_BUCKET)
     .upload(path, file, { contentType: file.type, upsert: false });
-  return error ? null : path;
+  if (!error) return { path, error: null };
+
+  console.error("커버 이미지 업로드 실패", {
+    name: error.name,
+    message: error.message,
+    status: error.status,
+    statusCode: error.statusCode,
+    file: { type: file.type, size: file.size },
+  });
+  return { path: null, error: coverUploadErrorMessage(error) };
 }
 
 // 이벤트 저장이 실패하면 방금 올린 객체를 지운다. 이 정리마저 실패하면 고아 파일로 남는다
@@ -101,13 +120,11 @@ export function EventForm({
     let coverPath: string | null | undefined;
     if (cover.kind === "new") {
       const uploaded = await uploadCover(cover.file);
-      if (!uploaded) {
-        toast.error(
-          "커버 이미지를 올리지 못했습니다. 잠시 후 다시 시도해주세요"
-        );
+      if (uploaded.error !== null) {
+        toast.error(uploaded.error);
         return;
       }
-      coverPath = uploaded;
+      coverPath = uploaded.path;
     } else if (cover.kind === "none" && defaultCoverUrl) {
       coverPath = null;
     }
